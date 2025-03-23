@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@types/axios": "^0.9.36",
+    "@types/material-ui": "^0.21.18",
+    "@types/node": "^22.13.11",
+    "@types/react": "^19.0.12"
+  }
+}
