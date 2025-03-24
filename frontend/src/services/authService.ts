@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { handleApiError } from '../utils/errorHandler';
+import { tokenManager } from '../utils/tokenManager';
 import { User } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
@@ -14,6 +16,23 @@ interface RefreshResponse {
 
 interface ApiError {
   message: string;
+}
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+interface LoginResponse {
+  token: string;
+  refreshToken: string;
+  username: string;
+  roles: string[];
+}
+
+interface RefreshTokenResponse {
+  token: string;
+  refreshToken: string;
 }
 
 // Create axios instance with default config
@@ -70,43 +89,74 @@ api.interceptors.response.use(
 );
 
 export const authService = {
-    login: async (username: string, password: string): Promise<User> => {
-        const response = await api.post<AuthResponse>('/auth/login', { username, password });
-        const { token, user } = response.data;
-        
-        // Set authorization header
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        return user;
+    login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+        try {
+            const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, credentials);
+            const { token, refreshToken } = response.data;
+            tokenManager.setToken(token, refreshToken);
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
     },
 
     logout: async (): Promise<void> => {
         try {
-            await api.post('/auth/logout');
-        } finally {
-            // Clear auth header and local storage
-            delete api.defaults.headers.common['Authorization'];
-            localStorage.removeItem('user');
+            await axios.post(`${API_URL}/auth/logout`);
+            tokenManager.clearToken();
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Clear tokens even if the logout request fails
+            tokenManager.clearToken();
         }
     },
 
-    refreshToken: async (): Promise<string> => {
-        const response = await api.post<RefreshResponse>('/auth/refresh');
-        const { token } = response.data;
-        
-        // Update authorization header
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        return token;
-    },
-
-    getCurrentUser: async (): Promise<User> => {
-        const response = await api.get<User>('/auth/user');
-        return response.data;
-    },
-
     isAuthenticated: (): boolean => {
-        return !!api.defaults.headers.common['Authorization'];
+        return tokenManager.isTokenValid();
+    },
+
+    refreshToken: async (): Promise<boolean> => {
+        try {
+            const refreshToken = tokenManager.getRefreshToken();
+            if (!refreshToken) {
+                return false;
+            }
+
+            const response = await axios.post<RefreshTokenResponse>(`${API_URL}/auth/refresh`, {
+                refreshToken
+            });
+
+            const { token, refreshToken: newRefreshToken } = response.data;
+            tokenManager.setToken(token, newRefreshToken);
+            return true;
+        } catch (error) {
+            console.error('Token refresh failed:', error);
+            return false;
+        }
+    },
+
+    validateToken: async (): Promise<boolean> => {
+        try {
+            const token = tokenManager.getToken();
+            if (!token) {
+                return false;
+            }
+
+            const response = await axios.get(`${API_URL}/auth/validate`);
+            return response.status === 200;
+        } catch (error) {
+            console.error('Token validation failed:', error);
+            return false;
+        }
+    },
+
+    getCurrentUser: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/auth/me`);
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
     }
 };
 

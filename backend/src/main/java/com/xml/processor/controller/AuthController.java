@@ -1,6 +1,7 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.config.JwtService;
+import com.xml.processor.model.RefreshTokenRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -115,17 +116,5 @@ class LoginRequest {
 
     public void setPassword(String password) {
         this.password = password;
-    }
-}
-
-class RefreshTokenRequest {
-    private String refreshToken;
-    
-    public String getRefreshToken() {
-        return refreshToken;
-    }
-
-    public void setRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
     }
 }

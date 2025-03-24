@@ -1,15 +1,16 @@
 package com.xml.processor.controller;
 
-import com.xml.processor.config.ClientContextHolder;
 import com.xml.processor.model.ProcessedFile;
-import com.xml.processor.service.XmlProcessorService;
+import com.xml.processor.service.interfaces.XmlProcessorService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import java.util.List;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/files")
 public class FileUploadController {
 
     private final XmlProcessorService xmlProcessorService;
@@ -18,27 +19,38 @@ public class FileUploadController {
         this.xmlProcessorService = xmlProcessorService;
     }
 
-    @PostMapping("/upload")
+    @PostMapping("/upload/{interfaceId}")
     public ResponseEntity<ProcessedFile> uploadFile(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("clientId") Long clientId,
-            @RequestParam("interfaceId") Long interfaceId) {
-        
-        // Set client context from parameters
-        ClientContextHolder.setClientId(clientId);
-        
-        // Process file with interface ID
-        ProcessedFile processedFile = xmlProcessorService.processXmlFile(file, interfaceId);
-        return ResponseEntity.ok(processedFile);
+            @PathVariable Long interfaceId) {
+        return ResponseEntity.ok(xmlProcessorService.processXmlFileAsync(file, interfaceId).join());
     }
 
-    @GetMapping("/files/processed")
-    public ResponseEntity<List<ProcessedFile>> getProcessedFiles() {
-        return ResponseEntity.ok(xmlProcessorService.getProcessedFiles());
+    @GetMapping("/processed")
+    public ResponseEntity<Page<ProcessedFile>> getProcessedFiles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "processedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(xmlProcessorService.getProcessedFiles(pageRequest));
     }
 
-    @GetMapping("/files/errors")
-    public ResponseEntity<List<ProcessedFile>> getErrorFiles() {
-        return ResponseEntity.ok(xmlProcessorService.getErrorFiles());
+    @GetMapping("/errors")
+    public ResponseEntity<Page<ProcessedFile>> getErrorFiles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "processedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(xmlProcessorService.getErrorFiles(pageRequest));
+    }
+
+    @PostMapping("/reprocess/{fileId}")
+    public ResponseEntity<Void> reprocessFile(@PathVariable Long fileId) {
+        xmlProcessorService.reprocessFile(fileId);
+        return ResponseEntity.ok().build();
     }
 } 

@@ -1,12 +1,61 @@
 import axios from 'axios';
 
+export interface ApiError {
+    message: string;
+    code?: string;
+    details?: any;
+}
+
+interface AxiosErrorResponse {
+    response?: {
+        data?: {
+            message?: string;
+            [key: string]: any;
+        };
+        status?: number;
+    };
+    message: string;
+}
+
+export const handleApiError = (error: unknown): ApiError => {
+    if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as AxiosErrorResponse;
+        return {
+            message: axiosError.response?.data?.message || axiosError.message,
+            code: axiosError.response?.status?.toString(),
+            details: axiosError.response?.data
+        };
+    }
+
+    if (error instanceof Error) {
+        return {
+            message: error.message,
+            code: 'UNKNOWN_ERROR'
+        };
+    }
+
+    return {
+        message: 'An unexpected error occurred',
+        code: 'UNKNOWN_ERROR'
+    };
+};
+
+export const isApiError = (error: unknown): error is ApiError => {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as ApiError).message === 'string'
+    );
+};
+
 export interface ErrorResponse {
     status: number;
     message: string;
     validationErrors?: string[];
 }
 
-export const handleApiError = (error: unknown, setError: (message: string) => void) => {
+export const handleApiErrorOld = (error: unknown, setError: (message: string) => void) => {
     if (error && typeof error === 'object' && 'response' in error) {
         const response = (error as any).response?.data;
 

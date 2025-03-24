@@ -4,7 +4,18 @@ import { PageResponse } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
+interface CurrentUser {
+    username: string;
+    roles: string[];
+    authenticated: boolean;
+}
+
 export const userService = {
+    getCurrentUser: async (): Promise<CurrentUser> => {
+        const response = await axios.get<CurrentUser>(`${API_URL}/user`);
+        return response.data;
+    },
+
     getAllUsers: async (page: number = 0, size: number = 10, sortBy: string = 'username', direction: string = 'asc'): Promise<PageResponse<User>> => {
         const response = await axios.get<PageResponse<User>>(`${API_URL}/users`, {
             params: { page, size, sortBy, direction }
@@ -12,16 +23,16 @@ export const userService = {
         return response.data;
     },
 
-    searchUsers: async (searchTerm: string, page: number = 0, size: number = 10, sortBy: string = 'username', direction: string = 'asc'): Promise<PageResponse<User>> => {
-        const response = await axios.get<PageResponse<User>>(`${API_URL}/users/search`, {
-            params: { searchTerm, page, size, sortBy, direction }
+    searchUsers: async (searchTerm: string, page: number = 0, size: number = 10): Promise<PageResponse<User>> => {
+        const response = await axios.get<PageResponse<User>>(`${API_URL}/users`, {
+            params: { searchTerm, page, size }
         });
         return response.data;
     },
 
-    getUsersByStatus: async (enabled: boolean, page: number = 0, size: number = 10, sortBy: string = 'username', direction: string = 'asc'): Promise<PageResponse<User>> => {
-        const response = await axios.get<PageResponse<User>>(`${API_URL}/users/status`, {
-            params: { enabled, page, size, sortBy, direction }
+    getUsersByStatus: async (enabled: boolean, page: number = 0, size: number = 10): Promise<PageResponse<User>> => {
+        const response = await axios.get<PageResponse<User>>(`${API_URL}/users`, {
+            params: { enabled, page, size }
         });
         return response.data;
     },

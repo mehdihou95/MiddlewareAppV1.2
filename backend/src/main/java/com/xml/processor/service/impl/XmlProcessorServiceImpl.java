@@ -1,24 +1,27 @@
 package com.xml.processor.service.impl;
 
+import com.xml.processor.exception.ValidationException;
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.ProcessedFile;
 import com.xml.processor.repository.InterfaceRepository;
-import com.xml.processor.service.ProcessedFileService;
-import com.xml.processor.service.XmlProcessorService;
-import com.xml.processor.service.DocumentProcessingStrategyService;
-import com.xml.processor.service.strategy.DocumentProcessingStrategy;
+import com.xml.processor.service.interfaces.ProcessedFileService;
+import com.xml.processor.service.interfaces.XmlProcessorService;
+import com.xml.processor.service.interfaces.DocumentProcessingStrategyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.xml.sax.SAXException;
+import org.w3c.dom.Document;
 
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Implementation of XmlProcessorService.
+ * Provides operations for validating, transforming, and processing XML files.
+ */
 @Service
 public class XmlProcessorServiceImpl implements XmlProcessorService {
 
@@ -33,49 +36,27 @@ public class XmlProcessorServiceImpl implements XmlProcessorService {
 
     @Override
     @Transactional
-    public ProcessedFile processXmlFile(MultipartFile file, Long interfaceId) {
+    public ProcessedFile processXmlFile(MultipartFile file, Interface interfaceEntity) {
+        return strategyService.processDocument(file, interfaceEntity);
+    }
+
+    @Override
+    public boolean validateXmlFile(MultipartFile file, Interface interfaceEntity) {
         try {
-            // Get interface configuration
-            Interface interfaceEntity = interfaceRepository.findById(interfaceId)
-                .orElseThrow(() -> new RuntimeException("Interface not found with id: " + interfaceId));
-
-            // Create processed file record
-            ProcessedFile processedFile = new ProcessedFile();
-            processedFile.setFileName(file.getOriginalFilename());
-            processedFile.setInterfaceEntity(interfaceEntity);
-            processedFile.setStatus("PROCESSING");
-            processedFile.setProcessedAt(LocalDateTime.now());
-
-            // Save initial record
-            processedFile = processedFileService.createProcessedFile(processedFile);
-
-            // Get appropriate processing strategy
-            DocumentProcessingStrategy strategy = strategyService.getStrategy(interfaceEntity);
-            
-            // Process the document
-            // TODO: Implement actual XML processing logic here
-            // This would include:
-            // 1. Validating XML against interface schema
-            // 2. Applying mapping rules
-            // 3. Transforming data
-            // 4. Storing processed data
-
-            // Update status to success
-            processedFile.setStatus("SUCCESS");
-            processedFile.setProcessedAt(LocalDateTime.now());
-            return processedFileService.updateProcessedFile(processedFile.getId(), processedFile);
-
+            ProcessedFile result = strategyService.processDocument(file, interfaceEntity);
+            return "SUCCESS".equals(result.getStatus());
         } catch (Exception e) {
-            // Create error record
-            ProcessedFile errorFile = new ProcessedFile();
-            errorFile.setFileName(file.getOriginalFilename());
-            errorFile.setInterfaceEntity(interfaceRepository.findById(interfaceId).orElse(null));
-            errorFile.setStatus("ERROR");
-            errorFile.setErrorMessage(e.getMessage());
-            errorFile.setProcessedAt(LocalDateTime.now());
-            
-            return processedFileService.createProcessedFile(errorFile);
+            return false;
         }
+    }
+
+    @Override
+    public String transformXmlFile(MultipartFile file, Interface interfaceEntity) {
+        ProcessedFile result = strategyService.processDocument(file, interfaceEntity);
+        if (!"SUCCESS".equals(result.getStatus())) {
+            throw new ValidationException("Failed to transform XML file: " + result.getErrorMessage());
+        }
+        return result.getContent();
     }
 
     @Override
@@ -88,7 +69,7 @@ public class XmlProcessorServiceImpl implements XmlProcessorService {
     @Override
     @Transactional
     public CompletableFuture<ProcessedFile> processXmlFileAsync(MultipartFile file, Long interfaceId) {
-        return CompletableFuture.supplyAsync(() -> processXmlFile(file, interfaceId));
+        return CompletableFuture.supplyAsync(() -> processXmlFile(file, interfaceRepository.findById(interfaceId).orElse(null)));
     }
 
     @Override
@@ -108,5 +89,17 @@ public class XmlProcessorServiceImpl implements XmlProcessorService {
     @Transactional(readOnly = true)
     public List<ProcessedFile> getErrorFiles() {
         return processedFileService.getProcessedFilesByStatus("ERROR");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFiles(Pageable pageable) {
+        return processedFileService.getProcessedFilesByStatus("SUCCESS", pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getErrorFiles(Pageable pageable) {
+        return processedFileService.getProcessedFilesByStatus("ERROR", pageable);
     }
 } 

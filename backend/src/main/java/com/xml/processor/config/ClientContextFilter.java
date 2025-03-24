@@ -26,25 +26,27 @@ public class ClientContextFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
-        String clientIdHeader = request.getHeader(CLIENT_ID_HEADER);
+        String clientId = request.getHeader("X-Client-ID");
         String clientName = request.getHeader(CLIENT_NAME_HEADER);
 
-        if (clientIdHeader != null && !clientIdHeader.isEmpty()) {
+        if (clientId != null && !clientId.isEmpty()) {
             try {
-                Long clientId = Long.parseLong(clientIdHeader);
-                Optional<Client> clientOpt = clientService.getClientById(clientId);
+                Long id = Long.parseLong(clientId);
+                Optional<Client> clientOpt = clientService.getClientById(id);
                 if (clientOpt.isPresent()) {
                     ClientContextHolder.setClient(clientOpt.get());
-                } else {
-                    throw new RuntimeException("Client not found with ID: " + clientId);
                 }
             } catch (NumberFormatException e) {
-                throw new RuntimeException("Invalid client ID format: " + clientIdHeader);
+                // Invalid client ID format
             }
         } else if (clientName != null && !clientName.isEmpty()) {
             try {
-                Client client = clientService.getClientByName(clientName);
-                ClientContextHolder.setClient(client);
+                Optional<Client> clientOpt = clientService.getClientByName(clientName);
+                if (clientOpt.isPresent()) {
+                    ClientContextHolder.setClient(clientOpt.get());
+                } else {
+                    throw new RuntimeException("Client not found with name: " + clientName);
+                }
             } catch (RuntimeException e) {
                 throw new RuntimeException("Client not found with name: " + clientName);
             }

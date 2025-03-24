@@ -1,15 +1,21 @@
 package com.xml.processor.repository;
 
 import com.xml.processor.model.ProcessedFile;
+import com.xml.processor.model.Client;
+import com.xml.processor.model.Interface;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Repository interface for ProcessedFile entities.
+ */
 @Repository
 public interface ProcessedFileRepository extends JpaRepository<ProcessedFile, Long> {
     /**
@@ -56,4 +62,26 @@ public interface ProcessedFileRepository extends JpaRepository<ProcessedFile, Lo
 
     // Pageable methods
     Page<ProcessedFile> findByClient_IdAndProcessedAtBetween(Long clientId, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    List<ProcessedFile> findByClient(Client client);
+    
+    List<ProcessedFile> findByInterfaceEntity(Interface interfaceEntity);
+    
+    Page<ProcessedFile> findByInterfaceEntity_Id(Long interfaceId, Pageable pageable);
+    
+    Page<ProcessedFile> findByStatusAndProcessedAtBetween(String status, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    Page<ProcessedFile> findByInterfaceEntityId(Long interfaceId, Pageable pageable);
+
+    @Query("SELECT p FROM ProcessedFile p WHERE " +
+           "(:searchTerm IS NULL OR p.fileName LIKE %:searchTerm%) AND " +
+           "(:status IS NULL OR p.status = :status) AND " +
+           "(:startDate IS NULL OR p.processedAt >= :startDate) AND " +
+           "(:endDate IS NULL OR p.processedAt <= :endDate)")
+    Page<ProcessedFile> findBySearchCriteria(
+            @Param("searchTerm") String searchTerm,
+            @Param("status") String status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
 } 

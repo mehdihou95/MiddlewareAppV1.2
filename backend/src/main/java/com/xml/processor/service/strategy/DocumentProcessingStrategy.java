@@ -2,36 +2,48 @@ package com.xml.processor.service.strategy;
 
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.ProcessedFile;
+import org.springframework.web.multipart.MultipartFile;
 import org.w3c.dom.Document;
 
-import java.util.Map;
-
+/**
+ * Interface for document processing strategies.
+ * Each strategy implements a specific way of processing documents based on their type.
+ */
 public interface DocumentProcessingStrategy {
+    
     /**
-     * Process the XML document according to the specific strategy implementation
-     * @param document The XML document to process
-     * @param interfaceEntity The interface configuration
-     * @param clientId The client ID
-     * @return A map of processed data
+     * Process a document using this strategy.
+     *
+     * @param file The document file to process
+     * @param interfaceEntity The interface to process the file for
+     * @return The processed file record
      */
-    Map<String, Object> processDocument(Document document, Interface interfaceEntity, Long clientId);
+    ProcessedFile processDocument(MultipartFile file, Interface interfaceEntity);
 
     /**
-     * Validate if this strategy can handle the given interface type
-     * @param interfaceType The type of interface to check
-     * @return true if this strategy can handle the interface type
+     * Process a document using this strategy.
      */
-    boolean canHandle(String interfaceType);
+    ProcessedFile processDocument(Document document, Interface interfaceEntity, Long clientId);
 
     /**
-     * Get the priority of this strategy (higher priority strategies are checked first)
-     * @return The priority value
+     * Get the type of documents this strategy can process.
+     *
+     * @return The document type this strategy handles
      */
-    int getPriority();
+    String getDocumentType();
 
     /**
-     * Get the name of this strategy
-     * @return The strategy name
+     * Check if this strategy can handle the given document type.
+     */
+    boolean canHandle(String documentType);
+
+    /**
+     * Get the name of this strategy.
      */
     String getName();
+
+    /**
+     * Get the priority of this strategy.
+     */
+    int getPriority();
 } 

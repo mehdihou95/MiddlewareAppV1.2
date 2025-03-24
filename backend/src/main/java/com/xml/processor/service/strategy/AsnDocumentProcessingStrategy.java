@@ -1,13 +1,16 @@
 package com.xml.processor.service.strategy;
 
 import com.xml.processor.model.Interface;
+import com.xml.processor.model.ProcessedFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 import org.w3c.dom.Document;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Component
@@ -23,6 +26,11 @@ public class AsnDocumentProcessingStrategy extends AbstractDocumentProcessingStr
     private static final SimpleDateFormat OUTPUT_TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
     
     @Override
+    public String getDocumentType() {
+        return ASN_TYPE;
+    }
+    
+    @Override
     public boolean canHandle(String interfaceType) {
         return ASN_TYPE.equalsIgnoreCase(interfaceType);
     }
@@ -30,6 +38,29 @@ public class AsnDocumentProcessingStrategy extends AbstractDocumentProcessingStr
     @Override
     public String getName() {
         return "ASN Document Processor";
+    }
+
+    @Override
+    public ProcessedFile processDocument(MultipartFile file, Interface interfaceEntity) {
+        try {
+            ProcessedFile processedFile = new ProcessedFile();
+            processedFile.setFileName(file.getOriginalFilename());
+            processedFile.setInterfaceEntity(interfaceEntity);
+            processedFile.setClient(interfaceEntity.getClient());
+            processedFile.setProcessedAt(LocalDateTime.now());
+            processedFile.setStatus("SUCCESS");
+            return processedFile;
+        } catch (Exception e) {
+            logger.error("Error processing ASN document: {}", e.getMessage(), e);
+            ProcessedFile errorFile = new ProcessedFile();
+            errorFile.setFileName(file.getOriginalFilename());
+            errorFile.setInterfaceEntity(interfaceEntity);
+            errorFile.setClient(interfaceEntity.getClient());
+            errorFile.setProcessedAt(LocalDateTime.now());
+            errorFile.setStatus("ERROR");
+            errorFile.setErrorMessage(e.getMessage());
+            return errorFile;
+        }
     }
     
     @Override

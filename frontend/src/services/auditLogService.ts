@@ -16,8 +16,8 @@ class AuditLogService {
   private getQueryString(params: AuditLogQueryParams): string {
     const searchParams = new URLSearchParams();
     
-    if (params.page !== undefined) searchParams.append('page', params.page.toString());
-    if (params.size !== undefined) searchParams.append('size', params.size.toString());
+    if (params.page !== undefined && params.page !== null) searchParams.append('page', params.page.toString());
+    if (params.size !== undefined && params.size !== null) searchParams.append('size', params.size.toString());
     if (params.sortBy) searchParams.append('sortBy', params.sortBy);
     if (params.direction) searchParams.append('direction', params.direction);
     if (params.startDate) searchParams.append('startDate', params.startDate);

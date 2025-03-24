@@ -9,10 +9,10 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (!user) {
+  if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
@@ -20,7 +20,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
     );
   }
 
-  if (!user.authenticated) {
+  if (!user || !user.authenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

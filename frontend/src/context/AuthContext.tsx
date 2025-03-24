@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { tokenManager } from '../utils/tokenManager';
 
 // Configure axios defaults
-axios.defaults.baseURL = 'http://localhost:8080';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+axios.defaults.baseURL = API_URL.replace(/\/api$/, ''); // Remove /api if present to match service URLs
 
 interface User {
   username: string;
@@ -31,91 +33,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Set up axios interceptors for authentication
-  useEffect(() => {
-    // Add a request interceptor to include JWT token in headers
-    const requestInterceptor = axios.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem('token');
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    // Add a response interceptor to handle token refresh
-    const responseInterceptor = axios.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-        
-        // If error is 401 and not a retry
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-          
-          try {
-            const refreshToken = localStorage.getItem('refreshToken');
-            if (refreshToken) {
-              const response = await axios.post<AuthResponse>('/api/auth/refresh', { refreshToken });
-              const { token } = response.data;
-              
-              localStorage.setItem('token', token);
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
-              
-              return axios(originalRequest);
-            }
-          } catch (refreshError) {
-            // If refresh fails, log out
-            logout();
-          }
-        }
-        
-        return Promise.reject(error);
-      }
-    );
-
-    // Clean up interceptors when component unmounts
-    return () => {
-      axios.interceptors.request.eject(requestInterceptor);
-      axios.interceptors.response.eject(responseInterceptor);
-    };
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setUser(null);
-        return;
-      }
-
-      const response = await axios.get<User>('/api/user');
-      if (response.status === 200 && response.data) {
-        setUser({
-          username: response.data.username,
-          roles: response.data.roles.map((role: string) => role.replace('ROLE_', '')),
-          authenticated: true
-        });
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      setUser(null);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-    }
-  };
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = tokenManager.getToken();
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.get<User>('/api/auth/validate');
+      if (response.status === 200 && response.data) {
+        setUser({
+          username: response.data.username,
+          roles: response.data.roles,
+          authenticated: true
+        });
+      } else {
+        setUser(null);
+        tokenManager.clearToken();
+      }
+    } catch (err) {
+      console.error('Auth check error:', err);
+      setUser(null);
+      tokenManager.clearToken();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
@@ -135,23 +87,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: cleanPassword
       });
 
-      if (response.status === 200) {
+      if (response.status === 200 && response.data) {
         const { token, refreshToken, username: responseUsername, roles } = response.data;
-        localStorage.setItem('token', token);
-        localStorage.setItem('refreshToken', refreshToken);
+        tokenManager.setToken(token, refreshToken);
         
         setUser({
           username: responseUsername,
           roles,
           authenticated: true
         });
+
+        // Set up axios default authorization header
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         return true;
       }
       return false;
     } catch (err: any) {
       console.error('Login error:', err.response || err);
-      setError('Invalid username or password');
+      const errorMessage = err.response?.data?.message || 'Invalid username or password';
+      setError(errorMessage);
       setUser(null);
       return false;
     } finally {
@@ -161,19 +116,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      setUser(null);
-      setError(null);
+      await axios.post('/api/auth/logout');
     } catch (err) {
       console.error('Logout error:', err);
-      setError('Failed to logout');
+    } finally {
+      tokenManager.clearToken();
+      delete axios.defaults.headers.common['Authorization'];
+      setUser(null);
+      setError(null);
     }
   };
 
-  const hasRole = (role: string) => {
+  const hasRole = (role: string): boolean => {
     return user?.roles.includes(role) ?? false;
   };
+
+  // Set up axios interceptors for authentication
+  useEffect(() => {
+    const requestInterceptor = axios.interceptors.request.use(
+      (config) => {
+        const token = tokenManager.getToken();
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+        
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          
+          try {
+            const success = await tokenManager.refreshToken();
+            if (success) {
+              const token = tokenManager.getToken();
+              if (token) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                return axios(originalRequest);
+              }
+            }
+          } catch (refreshError) {
+            await logout();
+          }
+        }
+        
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
+    };
+  }, []);
 
   const value = {
     user,

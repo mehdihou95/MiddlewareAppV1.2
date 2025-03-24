@@ -1,25 +1,26 @@
 package com.xml.processor.exception;
 
-import lombok.Getter;
-
-import java.util.List;
-
-@Getter
+/**
+ * Exception thrown when validation fails.
+ */
 public class ValidationException extends RuntimeException {
-    private final List<String> validationErrors;
-
+    
+    /**
+     * Constructs a new ValidationException with the specified message.
+     *
+     * @param message The error message
+     */
     public ValidationException(String message) {
         super(message);
-        this.validationErrors = List.of(message);
     }
 
-    public ValidationException(List<String> validationErrors) {
-        super(String.join(", ", validationErrors));
-        this.validationErrors = validationErrors;
-    }
-
+    /**
+     * Constructs a new ValidationException with the specified message and cause.
+     *
+     * @param message The error message
+     * @param cause The cause of the exception
+     */
     public ValidationException(String message, Throwable cause) {
         super(message, cause);
-        this.validationErrors = List.of(message);
     }
 } 

@@ -2,10 +2,12 @@ package com.xml.processor.service.strategy;
 
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.MappingRule;
+import com.xml.processor.model.ProcessedFile;
 import com.xml.processor.service.interfaces.MappingRuleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -15,6 +17,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,51 +35,69 @@ public abstract class AbstractDocumentProcessingStrategy implements DocumentProc
     protected MappingRuleService mappingRuleService;
     
     @Override
-    public Map<String, Object> processDocument(Document document, Interface interfaceEntity, Long clientId) {
-        Map<String, Object> result = new HashMap<>();
-        List<MappingRule> rules = mappingRuleService.getActiveMappingRules(interfaceEntity.getId());
-        
-        XPath xPath = XPathFactory.newInstance().newXPath();
-        
-        for (MappingRule rule : rules) {
-            try {
-                String xmlPath = rule.getXmlPath();
-                String databaseField = rule.getDatabaseField();
-                String transformation = rule.getTransformation();
-                String defaultValue = rule.getDefaultValue();
-                
-                // Evaluate XPath expression
-                NodeList nodes = (NodeList) xPath.evaluate(xmlPath, document, XPathConstants.NODESET);
-                String value = null;
-                
-                if (nodes != null && nodes.getLength() > 0) {
-                    Node node = nodes.item(0);
-                    value = node.getTextContent();
+    public ProcessedFile processDocument(Document document, Interface interfaceEntity, Long clientId) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            List<MappingRule> rules = mappingRuleService.getActiveMappingRules(interfaceEntity.getId(), Pageable.unpaged()).getContent();
+            
+            XPath xPath = XPathFactory.newInstance().newXPath();
+            
+            for (MappingRule rule : rules) {
+                try {
+                    String xmlPath = rule.getXmlPath();
+                    String databaseField = rule.getDatabaseField();
+                    String transformation = rule.getTransformation();
+                    String defaultValue = rule.getDefaultValue();
                     
-                    // Apply transformation if specified
-                    if (transformation != null && !transformation.isEmpty()) {
-                        value = applyTransformation(value, transformation);
+                    // Evaluate XPath expression
+                    NodeList nodes = (NodeList) xPath.evaluate(xmlPath, document, XPathConstants.NODESET);
+                    String value = null;
+                    
+                    if (nodes != null && nodes.getLength() > 0) {
+                        Node node = nodes.item(0);
+                        value = node.getTextContent();
+                        
+                        // Apply transformation if specified
+                        if (transformation != null && !transformation.isEmpty()) {
+                            value = applyTransformation(value, transformation);
+                        }
+                    } else if (defaultValue != null && !defaultValue.isEmpty()) {
+                        value = defaultValue;
                     }
-                } else if (defaultValue != null && !defaultValue.isEmpty()) {
-                    value = defaultValue;
-                }
-                
-                // Add to result map
-                if (value != null) {
-                    result.put(databaseField, value);
-                } else if (rule.isRequired()) {
-                    logger.warn("Required field {} not found in XML for rule {}", databaseField, rule.getName());
-                }
-                
-            } catch (Exception e) {
-                logger.error("Error processing mapping rule {}: {}", rule.getName(), e.getMessage(), e);
-                if (rule.isRequired()) {
-                    throw new RuntimeException("Failed to process required mapping rule: " + rule.getName(), e);
+                    
+                    // Add to result map
+                    if (value != null) {
+                        result.put(databaseField, value);
+                    } else if (rule.isRequired()) {
+                        logger.warn("Required field {} not found in XML for rule {}", databaseField, rule.getName());
+                    }
+                    
+                } catch (Exception e) {
+                    logger.error("Error processing mapping rule {}: {}", rule.getName(), e.getMessage(), e);
+                    if (rule.isRequired()) {
+                        throw new RuntimeException("Failed to process required mapping rule: " + rule.getName(), e);
+                    }
                 }
             }
+            
+            ProcessedFile processedFile = new ProcessedFile();
+            processedFile.setInterfaceEntity(interfaceEntity);
+            processedFile.setClient(interfaceEntity.getClient());
+            processedFile.setProcessedAt(LocalDateTime.now());
+            processedFile.setStatus("SUCCESS");
+            processedFile.setContent(result.toString());
+            return processedFile;
+            
+        } catch (Exception e) {
+            logger.error("Error processing document: {}", e.getMessage(), e);
+            ProcessedFile errorFile = new ProcessedFile();
+            errorFile.setInterfaceEntity(interfaceEntity);
+            errorFile.setClient(interfaceEntity.getClient());
+            errorFile.setProcessedAt(LocalDateTime.now());
+            errorFile.setStatus("ERROR");
+            errorFile.setErrorMessage(e.getMessage());
+            return errorFile;
         }
-        
-        return result;
     }
     
     protected String applyTransformation(String value, String transformation) {

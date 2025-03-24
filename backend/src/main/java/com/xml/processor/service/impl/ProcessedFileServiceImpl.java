@@ -1,8 +1,12 @@
 package com.xml.processor.service.impl;
 
+import com.xml.processor.exception.ResourceNotFoundException;
+import com.xml.processor.exception.ValidationException;
 import com.xml.processor.model.ProcessedFile;
+import com.xml.processor.model.Client;
+import com.xml.processor.model.Interface;
 import com.xml.processor.repository.ProcessedFileRepository;
-import com.xml.processor.service.ProcessedFileService;
+import com.xml.processor.service.interfaces.ProcessedFileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -15,7 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
+/**
+ * Implementation of ProcessedFileService.
+ * Provides operations for managing processed files.
+ */
 @Service
 public class ProcessedFileServiceImpl implements ProcessedFileService {
 
@@ -23,117 +32,186 @@ public class ProcessedFileServiceImpl implements ProcessedFileService {
     private ProcessedFileRepository processedFileRepository;
 
     @Override
-    @Cacheable(value = "processedFiles", key = "#id")
-    public ProcessedFile getProcessedFileById(Long id) {
-        return processedFileRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("ProcessedFile not found with id: " + id));
-    }
-
-    @Override
-    @Cacheable(value = "processedFiles", key = "'all'")
+    @Transactional(readOnly = true)
     public Page<ProcessedFile> getAllProcessedFiles(Pageable pageable) {
         return processedFileRepository.findAll(pageable);
     }
 
     @Override
-    @Cacheable(value = "processedFiles", key = "'client_' + #clientId")
+    @Transactional(readOnly = true)
     public Page<ProcessedFile> getProcessedFilesByClient(Long clientId, Pageable pageable) {
-        return processedFileRepository.findByClientId(clientId, pageable);
+        return processedFileRepository.findByClient_Id(clientId, pageable);
     }
 
     @Override
-    @Cacheable(value = "processedFiles", key = "'search_' + #fileName")
-    public Page<ProcessedFile> searchProcessedFiles(String fileName, Pageable pageable) {
-        return processedFileRepository.findByFileNameContainingIgnoreCase(fileName, pageable);
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByInterface(Long interfaceId, Pageable pageable) {
+        return processedFileRepository.findByInterfaceEntity_Id(interfaceId, pageable);
     }
 
     @Override
-    @Cacheable(value = "processedFiles", key = "'status_' + #status")
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByDateRange(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
+        return processedFileRepository.findByProcessedAtBetween(startDate, endDate, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<ProcessedFile> getProcessedFilesByStatus(String status, Pageable pageable) {
         return processedFileRepository.findByStatus(status, pageable);
     }
 
     @Override
-    @Cacheable(value = "processedFiles", key = "'date_range_' + #startDate + '_' + #endDate")
-    public Page<ProcessedFile> getProcessedFilesByDateRange(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
-        return processedFileRepository.findByCreatedAtBetween(startDate, endDate, pageable);
-    }
-
-    @Override
-    @Cacheable(value = "processedFiles", key = "'client_status_' + #clientId + '_' + #status")
-    public Page<ProcessedFile> getProcessedFilesByClientAndStatus(Long clientId, String status, Pageable pageable) {
-        return processedFileRepository.findByClientIdAndStatus(clientId, status, pageable);
-    }
-
-    @Override
-    @Cacheable(value = "processedFiles", key = "'client_date_' + #clientId + '_' + #startDate + '_' + #endDate")
-    public Page<ProcessedFile> getProcessedFilesByClientAndDateRange(Long clientId, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
-        return processedFileRepository.findByClient_IdAndProcessedAtBetween(clientId, startDate, endDate, pageable);
+    @Transactional(readOnly = true)
+    public Optional<ProcessedFile> getProcessedFileById(Long id) {
+        return processedFileRepository.findById(id);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "processedFiles", allEntries = true)
     public ProcessedFile createProcessedFile(ProcessedFile processedFile) {
+        validateProcessedFile(processedFile);
+        processedFile.setProcessedAt(LocalDateTime.now());
         return processedFileRepository.save(processedFile);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "processedFiles", key = "#id")
     public ProcessedFile updateProcessedFile(Long id, ProcessedFile processedFile) {
-        ProcessedFile existingFile = getProcessedFileById(id);
-        // Update fields
+        ProcessedFile existingFile = processedFileRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProcessedFile not found with id: " + id));
+        
+        validateProcessedFile(processedFile);
+        
         existingFile.setFileName(processedFile.getFileName());
         existingFile.setStatus(processedFile.getStatus());
         existingFile.setErrorMessage(processedFile.getErrorMessage());
+        existingFile.setInterfaceEntity(processedFile.getInterfaceEntity());
+        existingFile.setClient(processedFile.getClient());
         existingFile.setProcessedAt(processedFile.getProcessedAt());
+        
         return processedFileRepository.save(existingFile);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "processedFiles", key = "#id")
     public void deleteProcessedFile(Long id) {
+        if (!processedFileRepository.existsById(id)) {
+            throw new ResourceNotFoundException("ProcessedFile not found with id: " + id);
+        }
         processedFileRepository.deleteById(id);
     }
 
     @Override
-    public Page<ProcessedFile> getProcessedFiles(int page, int size, String sortBy, String sortDirection, String searchTerm, String status, LocalDateTime startDate, LocalDateTime endDate) {
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getErrorFiles(Pageable pageable) {
+        return processedFileRepository.findByStatus("ERROR", pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getErrorFilesByDateRange(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
+        return processedFileRepository.findByStatusAndProcessedAtBetween("ERROR", startDate, endDate, pageable);
+    }
+
+    private void validateProcessedFile(ProcessedFile processedFile) {
+        if (processedFile.getFileName() == null || processedFile.getFileName().trim().isEmpty()) {
+            throw new ValidationException("File name is required");
+        }
+        if (processedFile.getStatus() == null || processedFile.getStatus().trim().isEmpty()) {
+            throw new ValidationException("Status is required");
+        }
+        if (processedFile.getInterfaceEntity() == null || processedFile.getInterfaceEntity().getId() == null) {
+            throw new ValidationException("Interface is required");
+        }
+        if (processedFile.getClient() == null || processedFile.getClient().getId() == null) {
+            throw new ValidationException("Client is required");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFiles(int page, int size, String sortBy, String sortDirection, 
+                                               String searchTerm, String status, LocalDateTime startDate, LocalDateTime endDate) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
-
-        if (searchTerm != null && !searchTerm.isEmpty()) {
-            return searchProcessedFiles(searchTerm, pageable);
-        } else if (status != null && !status.isEmpty()) {
-            return getProcessedFilesByStatus(status, pageable);
+        
+        if (status != null && startDate != null && endDate != null) {
+            return processedFileRepository.findByStatusAndProcessedAtBetween(status, startDate, endDate, pageable);
+        } else if (status != null) {
+            return processedFileRepository.findByStatus(status, pageable);
         } else if (startDate != null && endDate != null) {
-            return getProcessedFilesByDateRange(startDate, endDate, pageable);
+            return processedFileRepository.findByProcessedAtBetween(startDate, endDate, pageable);
+        } else {
+            return processedFileRepository.findAll(pageable);
         }
-
-        return getAllProcessedFiles(pageable);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<ProcessedFile> getProcessedFilesByClient(Long clientId, int page, int size, String sortBy, String sortDirection) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
-        return getProcessedFilesByClient(clientId, PageRequest.of(page, size, sort));
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return processedFileRepository.findByClient_Id(clientId, pageable);
     }
 
     @Override
-    public Page<ProcessedFile> getProcessedFilesByClientAndStatus(Long clientId, String status, int page, int size, String sortBy, String sortDirection) {
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByClientAndStatus(Long clientId, String status, 
+                                                                int page, int size, String sortBy, String sortDirection) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
-        return getProcessedFilesByClientAndStatus(clientId, status, PageRequest.of(page, size, sort));
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return processedFileRepository.findByClient_IdAndStatus(clientId, status, pageable);
     }
 
     @Override
-    public Page<ProcessedFile> getProcessedFilesByClientAndDateRange(Long clientId, LocalDateTime startDate, LocalDateTime endDate, int page, int size, String sortBy, String sortDirection) {
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByClientAndDateRange(Long clientId, LocalDateTime startDate, LocalDateTime endDate,
+                                                                   int page, int size, String sortBy, String sortDirection) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
-        return getProcessedFilesByClientAndDateRange(clientId, startDate, endDate, PageRequest.of(page, size, sort));
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return processedFileRepository.findByClient_IdAndProcessedAtBetween(clientId, startDate, endDate, pageable);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ProcessedFile> getProcessedFilesByStatus(String status) {
         return processedFileRepository.findByStatus(status);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByClient(Long clientId, PageRequest pageRequest) {
+        return processedFileRepository.findByClient_Id(clientId, pageRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> searchProcessedFiles(String fileName, PageRequest pageRequest) {
+        return processedFileRepository.findByFileNameContainingIgnoreCase(fileName, pageRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByStatus(String status, PageRequest pageRequest) {
+        return processedFileRepository.findByStatus(status, pageRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByDateRange(LocalDateTime startDate, LocalDateTime endDate, PageRequest pageRequest) {
+        return processedFileRepository.findByProcessedAtBetween(startDate, endDate, pageRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByClientAndStatus(Long clientId, String status, PageRequest pageRequest) {
+        return processedFileRepository.findByClient_IdAndStatus(clientId, status, pageRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProcessedFile> getProcessedFilesByClientAndDateRange(Long clientId, LocalDateTime startDate, LocalDateTime endDate, PageRequest pageRequest) {
+        return processedFileRepository.findByClient_IdAndProcessedAtBetween(clientId, startDate, endDate, pageRequest);
     }
 } 

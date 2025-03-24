@@ -1,6 +1,7 @@
 package com.xml.processor.service;
 
 import com.xml.processor.model.Client;
+import com.xml.processor.model.ClientStatus;
 import com.xml.processor.model.AsnHeader;
 import com.xml.processor.model.AsnLine;
 import com.xml.processor.model.ProcessedFile;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,14 +50,16 @@ public class MultiTenantServiceTest {
         // Create test clients
         client1 = new Client();
         client1.setName("TEST_CLIENT_1");
+        client1.setCode("TC1");
         client1.setDescription("Test Client 1");
-        client1.setStatus(Client.ClientStatus.ACTIVE);
+        client1.setStatus(ClientStatus.ACTIVE);
         client1 = clientService.saveClient(client1);
 
         client2 = new Client();
         client2.setName("TEST_CLIENT_2");
+        client2.setCode("TC2");
         client2.setDescription("Test Client 2");
-        client2.setStatus(Client.ClientStatus.ACTIVE);
+        client2.setStatus(ClientStatus.ACTIVE);
         client2 = clientService.saveClient(client2);
     }
 
@@ -65,12 +69,16 @@ public class MultiTenantServiceTest {
         AsnHeader header1 = new AsnHeader();
         header1.setClient(client1);
         header1.setDocumentNumber("DOC001");
+        header1.setDocumentDate(LocalDateTime.now().toString());
+        header1.setStatus("ACTIVE");
         asnHeaderRepository.save(header1);
 
         // Create test data for client2
         AsnHeader header2 = new AsnHeader();
         header2.setClient(client2);
         header2.setDocumentNumber("DOC002");
+        header2.setDocumentDate(LocalDateTime.now().toString());
+        header2.setStatus("ACTIVE");
         asnHeaderRepository.save(header2);
 
         // Verify data isolation
@@ -89,6 +97,7 @@ public class MultiTenantServiceTest {
         ProcessedFile file1 = new ProcessedFile();
         file1.setClient(client1);
         file1.setFileName("test1.xml");
+        file1.setStatus("PENDING");
         processedFileRepository.save(file1);
 
         // Attempt to access client1's data through client2's context
@@ -99,9 +108,15 @@ public class MultiTenantServiceTest {
     @Test
     void testClientDeletion() {
         // Create test data for client1
-        MappingRule rule1 = new MappingRule();
-        rule1.setClient(client1);
+        MappingRule rule1 = new MappingRule(); // Use default constructor
         rule1.setName("Test Rule 1");
+        rule1.setXmlPath("/root/element");
+        rule1.setDatabaseField("target");
+        rule1.setSourceField("source");
+        rule1.setTargetField("target");
+        rule1.setTableName("test_table");
+        rule1.setDataType("String");
+        rule1.setClient(client1);
         mappingRuleRepository.save(rule1);
 
         // Delete client1
@@ -115,18 +130,27 @@ public class MultiTenantServiceTest {
     @Test
     void testClientStatusChange() {
         // Create test data for client1
+        AsnHeader header = new AsnHeader();
+        header.setClient(client1);
+        header.setDocumentNumber("DOC001");
+        header.setDocumentDate(LocalDateTime.now().toString());
+        header.setStatus("ACTIVE");
+        header = asnHeaderRepository.save(header);
+
         AsnLine line1 = new AsnLine();
         line1.setClient(client1);
         line1.setLineNumber("LINE001");
+        line1.setHeader(header);
+        line1.setStatus("ACTIVE");
         asnLineRepository.save(line1);
 
         // Suspend client1
-        client1.setStatus(Client.ClientStatus.SUSPENDED);
+        client1.setStatus(ClientStatus.SUSPENDED);
         client1 = clientService.saveClient(client1);
 
         // Verify data is still accessible but client is suspended
         List<AsnLine> client1Lines = asnLineRepository.findByClient_Id(client1.getId());
         assertEquals(1, client1Lines.size());
-        assertEquals(Client.ClientStatus.SUSPENDED, client1.getStatus());
+        assertEquals(ClientStatus.SUSPENDED, client1.getStatus());
     }
 } 

@@ -2,7 +2,7 @@ package com.xml.processor.service.impl;
 
 import com.xml.processor.model.AuditLog;
 import com.xml.processor.repository.AuditLogRepository;
-import com.xml.processor.service.AuditLogService;
+import com.xml.processor.service.interfaces.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class AuditLogServiceImpl implements AuditLogService {
@@ -30,6 +31,23 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
+    public AuditLog getAuditLogById(Long id) {
+        return auditLogRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Audit log not found with id: " + id));
+    }
+
+    @Override
+    @Transactional
+    public void deleteAuditLog(Long id) {
+        auditLogRepository.deleteById(id);
+    }
+
+    @Override
+    public Page<AuditLog> getAuditLogsByClient(Long clientId, Pageable pageable) {
+        return auditLogRepository.findByClientId(clientId, pageable);
+    }
+
+    @Override
     public Page<AuditLog> getAuditLogsByUsername(String username, Pageable pageable) {
         return auditLogRepository.findByUsername(username, pageable);
     }
@@ -43,6 +61,14 @@ public class AuditLogServiceImpl implements AuditLogService {
     @Override
     public Page<AuditLog> getAuditLogsByAction(String action, Pageable pageable) {
         return auditLogRepository.findByAction(action, pageable);
+    }
+
+    @Override
+    public Page<AuditLog> getAuditLogsByDateRange(String startDate, String endDate, Pageable pageable) {
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        LocalDateTime start = LocalDateTime.parse(startDate, formatter);
+        LocalDateTime end = LocalDateTime.parse(endDate, formatter);
+        return getAuditLogsByDateRange(start, end, pageable);
     }
 
     @Override

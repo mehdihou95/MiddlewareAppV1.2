@@ -1,10 +1,12 @@
 package com.xml.processor.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.EqualsAndHashCode;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "mapping_rules")
 @EqualsAndHashCode(callSuper = true)
@@ -64,6 +66,43 @@ public class MappingRule extends BaseEntity {
 
     @Column
     private String xsdElement;
+
+    @Column
+    private Boolean isDefault;
+
+    @Column
+    private String transformationRule;
+
+    public MappingRule() {
+        super();
+        this.isActive = true;
+        this.isAttribute = false;
+        this.required = false;
+    }
+
+    public MappingRule(MappingRule other) {
+        setId(other.getId());
+        setSourceField(other.getSourceField());
+        setTargetField(other.getTargetField());
+        setTransformationRule(other.getTransformationRule());
+        setIsActive(other.getIsActive());
+        setIsDefault(other.getIsDefault());
+        setTableName(other.getTableName());
+        setName(other.getName());
+        setXmlPath(other.getXmlPath());
+        setDatabaseField(other.getDatabaseField());
+        setRequired(other.getRequired());
+        setDefaultValue(other.getDefaultValue());
+        setPriority(other.getPriority());
+        setInterfaceEntity(other.getInterfaceEntity());
+        setDescription(other.getDescription());
+        setValidationRule(other.getValidationRule());
+        setDataType(other.getDataType());
+        setIsAttribute(other.getIsAttribute());
+        setXsdElement(other.getXsdElement());
+        setCreatedAt(other.getCreatedAt());
+        setUpdatedAt(other.getUpdatedAt());
+    }
 
     // Compatibility methods
     public String getXmlPath() {

@@ -8,10 +8,19 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.Arrays;
 
+/**
+ * Configuration class for caching in the application.
+ * Defines cache names and cache manager configuration.
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {
-
+    
+    /**
+     * Creates a cache manager with predefined cache names.
+     *
+     * @return The configured CacheManager
+     */
     @Bean
     public CacheManager cacheManager() {
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager();
@@ -19,7 +28,12 @@ public class CacheConfig {
             "clients",
             "interfaces",
             "mappingRules",
-            "processedFiles"
+            "processedFiles",
+            "users",
+            "auditLogs",
+            "asnHeaders",
+            "asnLines",
+            "xsdSchemas"
         ));
         return cacheManager;
     }

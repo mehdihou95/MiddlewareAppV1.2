@@ -4,6 +4,9 @@ import com.xml.processor.model.Client;
 import com.xml.processor.model.Interface;
 import com.xml.processor.service.interfaces.ClientService;
 import com.xml.processor.service.interfaces.InterfaceService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,14 +57,27 @@ public class ClientController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Client>> getAllClients() {
-        return ResponseEntity.ok(clientService.getAllClients());
+    public ResponseEntity<Page<Client>> getAllClients(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(required = false) String nameFilter,
+            @RequestParam(required = false) String statusFilter) {
+        
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        
+        Page<Client> clients = clientService.getClients(pageRequest, nameFilter, statusFilter);
+        return ResponseEntity.ok(clients);
     }
 
     @GetMapping("/name/{name}")
     public ResponseEntity<Client> getClientByName(@PathVariable String name) {
         try {
-            return ResponseEntity.ok(clientService.getClientByName(name));
+            Optional<Client> clientOpt = clientService.getClientByName(name);
+            return clientOpt.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

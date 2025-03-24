@@ -201,7 +201,7 @@ const AuditLogs: React.FC = () => {
                 <TableCell>{log.id}</TableCell>
                 <TableCell>{log.action}</TableCell>
                 <TableCell>{log.username}</TableCell>
-                <TableCell>{log.clientId}</TableCell>
+                <TableCell>{log.clientId || 'N/A'}</TableCell>
                 <TableCell>{log.details}</TableCell>
                 <TableCell>{log.ipAddress}</TableCell>
                 <TableCell>{log.responseStatus}</TableCell>

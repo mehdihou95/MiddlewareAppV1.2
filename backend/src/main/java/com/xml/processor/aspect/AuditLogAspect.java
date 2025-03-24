@@ -1,7 +1,7 @@
 package com.xml.processor.aspect;
 
 import com.xml.processor.model.AuditLog;
-import com.xml.processor.service.AuditLogService;
+import com.xml.processor.service.interfaces.AuditLogService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

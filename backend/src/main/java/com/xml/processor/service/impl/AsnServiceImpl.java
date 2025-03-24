@@ -7,6 +7,8 @@ import com.xml.processor.repository.AsnHeaderRepository;
 import com.xml.processor.repository.AsnLineRepository;
 import com.xml.processor.service.interfaces.AsnService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,30 +44,30 @@ public class AsnServiceImpl implements AsnService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnHeader> getAllAsnHeaders() {
+    public Page<AsnHeader> getAllAsnHeaders(Pageable pageable) {
         Long clientId = ClientContextHolder.getClientId();
         if (clientId != null) {
-            return asnHeaderRepository.findByClient_Id(clientId);
+            return asnHeaderRepository.findByClient_Id(clientId, pageable);
         }
-        return asnHeaderRepository.findAll();
+        return asnHeaderRepository.findAll(pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnHeader> getAsnHeadersByClient_Id(Long clientId) {
-        return asnHeaderRepository.findByClient_Id(clientId);
+    public Page<AsnHeader> getAsnHeadersByClient_Id(Long clientId, Pageable pageable) {
+        return asnHeaderRepository.findByClient_Id(clientId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<AsnHeader> findByDocumentNumberAndClientId(String documentNumber, Long clientId) {
-        return asnHeaderRepository.findByDocumentNumberAndClientId(documentNumber, clientId);
+    public Optional<AsnHeader> findByDocumentNumberAndClient_Id(String documentNumber, Long clientId) {
+        return asnHeaderRepository.findByDocumentNumberAndClient_Id(documentNumber, clientId);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnHeader> findByClient_IdAndShipmentDateBetween(Long clientId, LocalDate startDate, LocalDate endDate) {
-        return asnHeaderRepository.findByClient_IdAndShipmentDateBetween(clientId, startDate, endDate);
+    public Page<AsnHeader> findByClient_IdAndShipmentDateBetween(Long clientId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        return asnHeaderRepository.findByClient_IdAndDocumentDateBetween(clientId, startDate, endDate, pageable);
     }
 
     @Override
@@ -126,63 +128,54 @@ public class AsnServiceImpl implements AsnService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> getAllAsnLines() {
+    public Page<AsnLine> getAllAsnLines(Pageable pageable) {
         Long clientId = ClientContextHolder.getClientId();
         if (clientId != null) {
-            return asnLineRepository.findByClient_Id(clientId);
+            return asnLineRepository.findByClient_Id(clientId, pageable);
         }
-        return asnLineRepository.findAll();
+        return asnLineRepository.findAll(pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> getAsnLinesByHeaderId(Long headerId) {
-        Long clientId = ClientContextHolder.getClientId();
-        if (clientId != null) {
-            return asnLineRepository.findByClient_IdAndHeaderId(clientId, headerId);
-        }
-        
-        // This is a simplified implementation; in a real system, you'd need to 
-        // ensure proper security checks for non-client-specific access
-        return asnLineRepository.findAll().stream()
-            .filter(line -> line.getHeader() != null && line.getHeader().getId().equals(headerId))
-            .toList();
+    public Page<AsnLine> getAsnLinesByHeader_Id(Long headerId, Pageable pageable) {
+        return asnLineRepository.findByHeader_Id(headerId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> getAsnLinesByClient_Id(Long clientId) {
-        return asnLineRepository.findByClient_Id(clientId);
+    public Page<AsnLine> getAsnLinesByClient_Id(Long clientId, Pageable pageable) {
+        return asnLineRepository.findByClient_Id(clientId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> findByClient_IdAndHeaderId(Long clientId, Long headerId) {
-        return asnLineRepository.findByClient_IdAndHeaderId(clientId, headerId);
+    public Page<AsnLine> findByClient_IdAndHeader_Id(Long clientId, Long headerId, Pageable pageable) {
+        return asnLineRepository.findByClient_IdAndHeader_Id(clientId, headerId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> findByClient_IdAndItemNumber(Long clientId, String itemNumber) {
-        return asnLineRepository.findByClient_IdAndItemNumber(clientId, itemNumber);
+    public Page<AsnLine> findByClient_IdAndItemNumber(Long clientId, String itemNumber, Pageable pageable) {
+        return asnLineRepository.findByClient_IdAndItemNumber(clientId, itemNumber, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> findByClient_IdAndLotNumber(Long clientId, String lotNumber) {
-        return asnLineRepository.findByClient_IdAndLotNumber(clientId, lotNumber);
+    public Page<AsnLine> findByClient_IdAndLotNumber(Long clientId, String lotNumber, Pageable pageable) {
+        return asnLineRepository.findByClient_IdAndLotNumber(clientId, lotNumber, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> findByClient_IdAndStatus(Long clientId, String status) {
-        return asnLineRepository.findByClient_IdAndStatus(clientId, status);
+    public Page<AsnLine> findByClient_IdAndStatus(Long clientId, String status, Pageable pageable) {
+        return asnLineRepository.findByClient_IdAndStatus(clientId, status, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AsnLine> findByClient_IdAndQuantityGreaterThan(Long clientId, Integer quantity) {
-        return asnLineRepository.findByClient_IdAndQuantityGreaterThan(clientId, quantity);
+    public Page<AsnLine> findByClient_IdAndQuantityGreaterThan(Long clientId, Integer quantity, Pageable pageable) {
+        return asnLineRepository.findByClient_IdAndQuantityGreaterThan(clientId, quantity, pageable);
     }
 
     @Override

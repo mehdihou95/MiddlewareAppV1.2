@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { Interface, PageResponse } from '../types';
+import { handleApiError } from '../utils/errorHandler';
+import { setClientContext } from '../utils/clientContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
@@ -9,49 +11,103 @@ export const interfaceService = {
     size: number = 10,
     sortBy: string = 'name',
     direction: string = 'asc',
-    nameFilter?: string,
-    typeFilter?: string,
-    isActiveFilter?: boolean
+    searchTerm?: string,
+    isActive?: boolean,
+    clientId?: number
   ): Promise<PageResponse<Interface>> => {
-    let params = new URLSearchParams();
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    params.append('sortBy', sortBy);
-    params.append('direction', direction);
-    
-    if (nameFilter) {
-      params.append('nameFilter', nameFilter);
+    try {
+      let params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+      params.append('sortBy', sortBy);
+      params.append('direction', direction);
+      
+      if (searchTerm) {
+        params.append('searchTerm', searchTerm);
+      }
+      
+      if (isActive !== undefined) {
+        params.append('isActive', isActive.toString());
+      }
+
+      // Set client context if provided
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      
+      const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces`, { params });
+      const data = response.data;
+      
+      return {
+        content: data.content || [],
+        pageable: {
+          sort: data.sort || { sorted: false, unsorted: true, empty: true },
+          pageNumber: data.number || 0,
+          pageSize: data.size || size,
+          offset: (data.number || 0) * (data.size || size),
+          paged: true,
+          unpaged: false
+        },
+        totalElements: data.totalElements || 0,
+        totalPages: data.totalPages || 0,
+        last: data.last || false,
+        first: data.first || false,
+        sort: data.sort || { sorted: false, unsorted: true, empty: true },
+        numberOfElements: data.numberOfElements || 0,
+        size: data.size || size,
+        number: data.number || 0,
+        empty: data.empty || false
+      };
+    } catch (error) {
+      throw handleApiError(error);
     }
-    
-    if (typeFilter) {
-      params.append('typeFilter', typeFilter);
+  },
+
+  getInterfaceById: async (id: number, clientId?: number): Promise<Interface> => {
+    try {
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      const response = await axios.get<Interface>(`${API_URL}/interfaces/${id}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
     }
-    
-    if (isActiveFilter !== undefined) {
-      params.append('isActiveFilter', isActiveFilter.toString());
+  },
+
+  createInterface: async (interfaceData: Omit<Interface, 'id'>, clientId?: number): Promise<Interface> => {
+    try {
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      const response = await axios.post<Interface>(`${API_URL}/interfaces`, interfaceData);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
     }
-    
-    const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces?${params.toString()}`);
-    return response.data;
   },
 
-  getInterfaceById: async (id: number): Promise<Interface> => {
-    const response = await axios.get<Interface>(`${API_URL}/interfaces/${id}`);
-    return response.data;
+  updateInterface: async (id: number, interfaceData: Partial<Interface>, clientId?: number): Promise<Interface> => {
+    try {
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      const response = await axios.put<Interface>(`${API_URL}/interfaces/${id}`, interfaceData);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
-  createInterface: async (interfaceData: Omit<Interface, 'id'>): Promise<Interface> => {
-    const response = await axios.post<Interface>(`${API_URL}/interfaces`, interfaceData);
-    return response.data;
-  },
-
-  updateInterface: async (id: number, interfaceData: Partial<Interface>): Promise<Interface> => {
-    const response = await axios.put<Interface>(`${API_URL}/interfaces/${id}`, interfaceData);
-    return response.data;
-  },
-
-  deleteInterface: async (id: number): Promise<void> => {
-    await axios.delete(`${API_URL}/interfaces/${id}`);
+  deleteInterface: async (id: number, clientId?: number): Promise<void> => {
+    try {
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      await axios.delete(`${API_URL}/interfaces/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
   getInterfacesByClient: async (
@@ -61,49 +117,19 @@ export const interfaceService = {
     sortBy: string = 'name',
     direction: string = 'asc'
   ): Promise<PageResponse<Interface>> => {
-    let params = new URLSearchParams();
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    params.append('sortBy', sortBy);
-    params.append('direction', direction);
-    
-    const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/client/${clientId}?${params.toString()}`);
-    return response.data;
-  },
-
-  searchInterfaces: async (
-    name: string,
-    page: number = 0,
-    size: number = 10,
-    sortBy: string = 'name',
-    direction: string = 'asc'
-  ): Promise<PageResponse<Interface>> => {
-    let params = new URLSearchParams();
-    params.append('name', name);
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    params.append('sortBy', sortBy);
-    params.append('direction', direction);
-    
-    const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/search?${params.toString()}`);
-    return response.data;
-  },
-
-  getInterfacesByType: async (
-    type: string,
-    page: number = 0,
-    size: number = 10,
-    sortBy: string = 'name',
-    direction: string = 'asc'
-  ): Promise<PageResponse<Interface>> => {
-    let params = new URLSearchParams();
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    params.append('sortBy', sortBy);
-    params.append('direction', direction);
-    
-    const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/type/${type}?${params.toString()}`);
-    return response.data;
+    try {
+      setClientContext(clientId);
+      let params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+      params.append('sortBy', sortBy);
+      params.append('sortDirection', direction);
+      
+      const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/client?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
   getInterfacesByStatus: async (
@@ -111,16 +137,24 @@ export const interfaceService = {
     page: number = 0,
     size: number = 10,
     sortBy: string = 'name',
-    direction: string = 'asc'
+    direction: string = 'asc',
+    clientId?: number
   ): Promise<PageResponse<Interface>> => {
-    let params = new URLSearchParams();
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    params.append('sortBy', sortBy);
-    params.append('direction', direction);
-    
-    const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/status/${isActive}?${params.toString()}`);
-    return response.data;
+    try {
+      if (clientId) {
+        setClientContext(clientId);
+      }
+      let params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+      params.append('sortBy', sortBy);
+      params.append('sortDirection', direction);
+      
+      const response = await axios.get<PageResponse<Interface>>(`${API_URL}/interfaces/status/${isActive}?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 
   getInterfaceMappings: async (id: number): Promise<any[]> => {
@@ -142,14 +176,7 @@ export const interfaceService = {
   },
   
   getInterfacesByClientId: async (clientId: number): Promise<Interface[]> => {
-    const response = await axios.get<Interface[]>(
-      `${API_URL}/clients/${clientId}/interfaces`,
-      {
-        headers: {
-          'X-Client-ID': clientId.toString()
-        }
-      }
-    );
+    const response = await axios.get<Interface[]>(`${API_URL}/interfaces/client`);
     return response.data;
   }
 }; 

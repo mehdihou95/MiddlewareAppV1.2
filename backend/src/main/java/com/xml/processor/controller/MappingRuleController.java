@@ -1,10 +1,14 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.model.MappingRule;
-import com.xml.processor.service.MappingRuleService;
+import com.xml.processor.service.interfaces.MappingRuleService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/mapping-rules")
@@ -25,13 +29,18 @@ public class MappingRuleController {
             @RequestParam(required = false) String nameFilter,
             @RequestParam(required = false) Boolean isActiveFilter) {
         
-        Page<MappingRule> mappingRules = mappingRuleService.getMappingRules(page, size, sortBy, direction, nameFilter, isActiveFilter);
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        
+        Page<MappingRule> mappingRules = mappingRuleService.getMappingRules(pageRequest, nameFilter, isActiveFilter);
         return ResponseEntity.ok(mappingRules);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<MappingRule> getMappingRule(@PathVariable Long id) {
-        return ResponseEntity.ok(mappingRuleService.getMappingRuleById(id));
+        Optional<MappingRule> ruleOpt = mappingRuleService.getMappingRuleById(id);
+        return ruleOpt.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -58,7 +67,10 @@ public class MappingRuleController {
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String direction) {
         
-        Page<MappingRule> mappingRules = mappingRuleService.getMappingRulesByInterface(interfaceId, page, size, sortBy, direction);
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        
+        Page<MappingRule> mappingRules = mappingRuleService.getMappingRulesByInterface(interfaceId, pageRequest);
         return ResponseEntity.ok(mappingRules);
     }
 
@@ -70,7 +82,10 @@ public class MappingRuleController {
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String direction) {
         
-        Page<MappingRule> mappingRules = mappingRuleService.searchMappingRules(name, page, size, sortBy, direction);
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        
+        Page<MappingRule> mappingRules = mappingRuleService.searchMappingRules(name, pageRequest);
         return ResponseEntity.ok(mappingRules);
     }
 
@@ -82,7 +97,10 @@ public class MappingRuleController {
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String direction) {
         
-        Page<MappingRule> mappingRules = mappingRuleService.getMappingRulesByStatus(isActive, page, size, sortBy, direction);
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        
+        Page<MappingRule> mappingRules = mappingRuleService.getMappingRulesByStatus(isActive, pageRequest);
         return ResponseEntity.ok(mappingRules);
     }
 } 

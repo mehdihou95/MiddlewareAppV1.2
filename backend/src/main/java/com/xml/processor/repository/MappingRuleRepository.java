@@ -1,6 +1,7 @@
 package com.xml.processor.repository;
 
 import com.xml.processor.model.MappingRule;
+import com.xml.processor.model.Client;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository interface for MappingRule entities.
+ */
 @Repository
 public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> {
     
@@ -47,6 +51,7 @@ public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> 
     /**
      * Find all mapping rules for a specific client with pagination
      */
+    @Query("SELECT m FROM MappingRule m WHERE m.client.id = ?1")
     Page<MappingRule> findByClient_Id(Long clientId, Pageable pageable);
 
     /**
@@ -57,6 +62,7 @@ public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> 
     /**
      * Find mapping rules by client ID and interface ID with pagination
      */
+    @Query("SELECT m FROM MappingRule m WHERE m.client.id = ?1 AND m.interfaceEntity.id = ?2")
     Page<MappingRule> findByClient_IdAndInterfaceEntity_Id(Long clientId, Long interfaceId, Pageable pageable);
 
     List<MappingRule> findByInterfaceId(Long interfaceId);
@@ -68,6 +74,17 @@ public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> 
     boolean existsByNameAndInterfaceId(String name, Long interfaceId);
     boolean existsByNameAndInterfaceIdAndIdNot(String name, Long interfaceId, Long id);
 
+    @Query("SELECT m FROM MappingRule m WHERE m.tableName = ?1 AND m.client.id = ?2")
     List<MappingRule> findByTableNameAndClient_Id(String tableName, Long clientId);
+    
+    @Query("DELETE FROM MappingRule m WHERE m.client.id = ?1 AND m.tableName = ?2")
     void deleteByClient_IdAndTableName(Long clientId, String tableName);
+
+    List<MappingRule> findByIsDefaultTrue();
+    List<MappingRule> findByClient(Client client);
+
+    List<MappingRule> findByTableName(String tableName);
+    
+    @Query("SELECT m FROM MappingRule m WHERE m.client.id = ?1 AND m.isActive = true")
+    Page<MappingRule> findByClient_IdAndIsActiveTrue(Long clientId, Pageable pageable);
 } 

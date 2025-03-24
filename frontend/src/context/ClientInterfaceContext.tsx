@@ -88,12 +88,27 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
   const refreshClients = async () => {
     setLoading(true);
     try {
-      const response = await clientService.getAllClients();
-      setClients(response.content);
+      const response = await clientService.getAllClients(0, 100); // Get first 100 clients for dropdown
+      setClients(response.content || []);
       setError(null);
-    } catch (err) {
-      setError('Failed to load clients');
+      
+      // If selected client is not in the list anymore, clear selection
+      if (selectedClient && !(response.content || []).find(c => c.id === selectedClient.id)) {
+        setSelectedClient(null);
+        setSelectedInterface(null);
+        localStorage.removeItem('selectedClientId');
+        localStorage.removeItem('selectedInterfaceId');
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
+      setError(`Failed to load clients: ${errorMessage}`);
       console.error('Error loading clients:', err);
+      // Clear selections on error
+      setClients([]);
+      setSelectedClient(null);
+      setSelectedInterface(null);
+      localStorage.removeItem('selectedClientId');
+      localStorage.removeItem('selectedInterfaceId');
     } finally {
       setLoading(false);
     }
@@ -104,12 +119,22 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
     
     setLoading(true);
     try {
-      const data = await interfaceService.getInterfacesByClientId(selectedClient.id);
+      const data = await clientService.getClientInterfaces(selectedClient.id);
       setInterfaces(data);
       setError(null);
-    } catch (err) {
-      setError('Failed to load interfaces');
+      
+      // If selected interface is not in the list anymore, clear selection
+      if (selectedInterface && !data.find(i => i.id === selectedInterface.id)) {
+        setSelectedInterface(null);
+        localStorage.removeItem('selectedInterfaceId');
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load interfaces';
+      setError(`Failed to load interfaces: ${errorMessage}`);
       console.error('Error loading interfaces:', err);
+      setInterfaces([]);
+      setSelectedInterface(null);
+      localStorage.removeItem('selectedInterfaceId');
     } finally {
       setLoading(false);
     }

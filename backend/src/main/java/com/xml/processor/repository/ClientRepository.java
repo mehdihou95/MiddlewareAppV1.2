@@ -8,6 +8,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * Repository interface for Client entities.
+ */
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
     Optional<Client> findByName(String name);
@@ -16,4 +19,6 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     boolean existsByNameAndIdNot(String name, Long id);
     Page<Client> findByNameContainingIgnoreCase(String name, Pageable pageable);
     Page<Client> findByStatus(String status, Pageable pageable);
+    Page<Client> findByNameContainingIgnoreCaseAndStatus(String name, String status, Pageable pageable);
+    boolean existsByCode(String code);
 } 

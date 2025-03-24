@@ -49,10 +49,10 @@ export interface ProcessedFile {
   id: number;
   fileName: string;
   status: string;
-  clientId: number;
-  interfaceId: number;
-  processedAt?: string;
   errorMessage?: string;
+  interfaceEntity: Interface;
+  processedData?: Record<string, any>;
+  processedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

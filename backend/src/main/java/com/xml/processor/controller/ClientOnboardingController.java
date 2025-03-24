@@ -2,8 +2,7 @@ package com.xml.processor.controller;
     
 import com.xml.processor.model.Client;
 import com.xml.processor.model.MappingRule;
-import com.xml.processor.service.ClientOnboardingService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.xml.processor.service.interfaces.ClientOnboardingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
     
@@ -13,8 +12,11 @@ import java.util.List;
 @RequestMapping("/api/client-onboarding")
 public class ClientOnboardingController {
     
-    @Autowired
-    private ClientOnboardingService clientOnboardingService;
+    private final ClientOnboardingService clientOnboardingService;
+    
+    public ClientOnboardingController(ClientOnboardingService clientOnboardingService) {
+        this.clientOnboardingService = clientOnboardingService;
+    }
     
     @PostMapping("/new")
     public ResponseEntity<Client> onboardNewClient(@RequestBody Client client) {

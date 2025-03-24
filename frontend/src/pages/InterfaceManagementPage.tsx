@@ -45,6 +45,7 @@ interface FormData {
   rootElement: string;
   namespace: string;
   schemaPath: string;
+  status: string;
 }
 
 interface FormErrors {
@@ -67,7 +68,8 @@ const InterfaceManagementPage: React.FC = () => {
     priority: 0,
     rootElement: '',
     namespace: '',
-    schemaPath: ''
+    schemaPath: '',
+    status: 'ACTIVE'
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({
     name: '',
@@ -111,7 +113,8 @@ const InterfaceManagementPage: React.FC = () => {
         priority: interfaceObj.priority || 0,
         rootElement: interfaceObj.rootElement || '',
         namespace: interfaceObj.namespace || '',
-        schemaPath: interfaceObj.schemaPath || ''
+        schemaPath: interfaceObj.schemaPath || '',
+        status: interfaceObj.status
       });
     } else {
       setEditingInterface(null);
@@ -123,7 +126,8 @@ const InterfaceManagementPage: React.FC = () => {
         priority: 0,
         rootElement: '',
         namespace: '',
-        schemaPath: ''
+        schemaPath: '',
+        status: 'ACTIVE'
       });
     }
     setOpenDialog(true);
@@ -140,7 +144,8 @@ const InterfaceManagementPage: React.FC = () => {
       priority: 0,
       rootElement: '',
       namespace: '',
-      schemaPath: ''
+      schemaPath: '',
+      status: 'ACTIVE'
     });
     setFormErrors({
       name: '',
@@ -183,17 +188,7 @@ const InterfaceManagementPage: React.FC = () => {
       if (editingInterface) {
         await interfaceService.updateInterface(editingInterface.id, backendInterfaceData);
       } else {
-        await axios.post(
-          `${API_URL}/clients/${selectedClient.id}/interfaces`,
-          backendInterfaceData,
-          {
-            withCredentials: true,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Client-ID': selectedClient.id.toString()
-            }
-          }
-        );
+        await interfaceService.createInterface(backendInterfaceData, selectedClient.id);
       }
       handleCloseDialog();
       loadInterfaces();

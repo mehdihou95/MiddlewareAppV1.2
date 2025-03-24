@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,29 +41,12 @@ public class MappingRuleServiceImpl implements MappingRuleService {
 
     @Override
     @Transactional(readOnly = true)
-    public MappingRule getMappingRuleById(Long id) {
+    public Optional<MappingRule> getMappingRuleById(Long id) {
         Long clientId = ClientContextHolder.getClientId();
         if (clientId != null) {
-            return mappingRuleRepository.findByIdAndClient_Id(id, clientId)
-                .orElseThrow(() -> new RuntimeException("Mapping rule not found with id: " + id));
+            return mappingRuleRepository.findByIdAndClient_Id(id, clientId);
         }
-        return mappingRuleRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Mapping rule not found with id: " + id));
-    }
-
-    @Transactional(readOnly = true)
-    public List<MappingRule> getAllMappingRules() {
-        Long clientId = ClientContextHolder.getClientId();
-        if (clientId != null) {
-            return mappingRuleRepository.findByClient_Id(clientId);
-        }
-        return mappingRuleRepository.findAll();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<MappingRule> getMappingRulesByClientId(Long clientId) {
-        return mappingRuleRepository.findByClient_Id(clientId);
+        return mappingRuleRepository.findById(id);
     }
 
     @Override
@@ -97,10 +81,6 @@ public class MappingRuleServiceImpl implements MappingRuleService {
         mappingRule.setIsAttribute(mappingRuleDetails.getIsAttribute());
         mappingRule.setXsdElement(mappingRuleDetails.getXsdElement());
         
-        if (mappingRuleDetails.getInterfaceEntity() != null) {
-            mappingRule.setInterfaceEntity(mappingRuleDetails.getInterfaceEntity());
-        }
-        
         return mappingRuleRepository.save(mappingRule);
     }
 
@@ -116,11 +96,6 @@ public class MappingRuleServiceImpl implements MappingRuleService {
         }
     }
     
-    @Transactional
-    public void deleteAllMappingRulesByClient(Long clientId) {
-        mappingRuleRepository.deleteByClient_Id(clientId);
-    }
-    
     @Override
     @Transactional
     public void saveMappingConfiguration(List<MappingRule> rules) {
@@ -128,25 +103,9 @@ public class MappingRuleServiceImpl implements MappingRuleService {
     }
     
     @Override
-    @Transactional(readOnly = true)
-    public List<MappingRule> findByTableNameAndClient_Id(String tableName, Long clientId) {
-        return mappingRuleRepository.findByTableNameAndClient_Id(tableName, clientId);
-    }
-    
-    @Override
     @Transactional
     public void deleteByClient_IdAndTableName(Long clientId, String tableName) {
         mappingRuleRepository.deleteByClient_IdAndTableName(clientId, tableName);
-    }
-    
-    @Override
-    @Transactional(readOnly = true)
-    public List<MappingRule> getActiveMappingRules(Long interfaceId) {
-        Interface interfaceEntity = interfaceRepository.findById(interfaceId)
-            .orElseThrow(() -> new RuntimeException("Interface not found with id: " + interfaceId));
-        
-        Long clientId = interfaceEntity.getClient().getId();
-        return mappingRuleRepository.findByClient_IdAndIsActive(clientId, true);
     }
 
     @Override
@@ -175,32 +134,57 @@ public class MappingRuleServiceImpl implements MappingRuleService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MappingRule> getMappingRules(int page, int size, String sortBy, String direction, String nameFilter, Boolean isActiveFilter) {
-        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-        
-        if (nameFilter != null && !nameFilter.isEmpty()) {
-            return mappingRuleRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
-        } else if (isActiveFilter != null) {
-            return mappingRuleRepository.findByIsActive(isActiveFilter, pageable);
-        }
-        
-        return mappingRuleRepository.findAll(pageable);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<MappingRule> searchMappingRules(String name, int page, int size, String sortBy, String direction) {
-        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+    public Page<MappingRule> searchMappingRules(String name, Pageable pageable) {
         return mappingRuleRepository.findByNameContainingIgnoreCase(name, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MappingRule> getMappingRulesByStatus(boolean isActive, int page, int size, String sortBy, String direction) {
-        Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+    public Page<MappingRule> getMappingRulesByStatus(boolean isActive, Pageable pageable) {
         return mappingRuleRepository.findByIsActive(isActive, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MappingRule> getMappingRules(Pageable pageable, String nameFilter, Boolean isActiveFilter) {
+        if (nameFilter != null && isActiveFilter != null) {
+            // TODO: Add repository method for combined filter
+            return mappingRuleRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
+        } else if (nameFilter != null) {
+            return mappingRuleRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
+        } else if (isActiveFilter != null) {
+            return mappingRuleRepository.findByIsActive(isActiveFilter, pageable);
+        }
+        return mappingRuleRepository.findAll(pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MappingRule> getMappingRulesByClientId(Long clientId, Pageable pageable) {
+        return mappingRuleRepository.findByClient_Id(clientId, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MappingRule> findByTableNameAndClient_Id(String tableName, Long clientId, Pageable pageable) {
+        List<MappingRule> rules = mappingRuleRepository.findByTableNameAndClient_Id(tableName, clientId);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), rules.size());
+        List<MappingRule> pageContent = rules.subList(start, end);
+        return new PageImpl<>(pageContent, pageable, rules.size());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MappingRule> getActiveMappingRules(Long interfaceId, Pageable pageable) {
+        Interface interfaceEntity = interfaceRepository.findById(interfaceId)
+            .orElseThrow(() -> new RuntimeException("Interface not found with id: " + interfaceId));
+        
+        Long clientId = interfaceEntity.getClient().getId();
+        List<MappingRule> rules = mappingRuleRepository.findByClient_IdAndIsActive(clientId, true);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), rules.size());
+        List<MappingRule> pageContent = rules.subList(start, end);
+        return new PageImpl<>(pageContent, pageable, rules.size());
     }
 } 

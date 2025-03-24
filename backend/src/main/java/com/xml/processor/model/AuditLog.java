@@ -1,14 +1,16 @@
 package com.xml.processor.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "audit_logs")
-@Data
+@Getter
+@Setter
 public class AuditLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

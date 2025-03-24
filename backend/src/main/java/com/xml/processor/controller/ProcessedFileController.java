@@ -1,7 +1,7 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.model.ProcessedFile;
-import com.xml.processor.service.ProcessedFileService;
+import com.xml.processor.service.interfaces.ProcessedFileService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/processed-files")
@@ -39,7 +40,9 @@ public class ProcessedFileController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ProcessedFile> getProcessedFile(@PathVariable Long id) {
-        return ResponseEntity.ok(processedFileService.getProcessedFileById(id));
+        Optional<ProcessedFile> fileOpt = processedFileService.getProcessedFileById(id);
+        return fileOpt.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping

@@ -1,8 +1,7 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.model.AuditLog;
-import com.xml.processor.service.AuditLogService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.xml.processor.service.interfaces.AuditLogService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -18,8 +17,11 @@ import java.time.LocalDateTime;
 @PreAuthorize("hasRole('ADMIN')")
 public class AuditLogController {
 
-    @Autowired
-    private AuditLogService auditLogService;
+    private final AuditLogService auditLogService;
+
+    public AuditLogController(AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     @GetMapping
     public ResponseEntity<Page<AuditLog>> getAuditLogs(

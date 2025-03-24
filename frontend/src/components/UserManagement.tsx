@@ -102,7 +102,8 @@ const UserManagement: React.FC = () => {
             setUsers(response.content);
             setTotalElements(response.totalElements);
         } catch (error) {
-            handleApiError(error, (message) => showSnackbar(message, 'error'));
+            const apiError = handleApiError(error);
+            showSnackbar(apiError.message, 'error');
         }
     };
 
@@ -174,7 +175,8 @@ const UserManagement: React.FC = () => {
                 const validationErrors = getValidationErrors(error);
                 validationErrors.forEach(error => showSnackbar(error, 'error'));
             } else {
-                handleApiError(error, (message) => showSnackbar(message, 'error'));
+                const apiError = handleApiError(error);
+                showSnackbar(apiError.message, 'error');
             }
         }
     };
@@ -186,7 +188,8 @@ const UserManagement: React.FC = () => {
                 showSnackbar('User deleted successfully', 'success');
                 fetchUsers();
             } catch (error) {
-                handleApiError(error, (message) => showSnackbar(message, 'error'));
+                const apiError = handleApiError(error);
+                showSnackbar(apiError.message, 'error');
             }
         }
     };
@@ -197,7 +200,8 @@ const UserManagement: React.FC = () => {
             showSnackbar('Account unlocked successfully', 'success');
             fetchUsers();
         } catch (error) {
-            handleApiError(error, (message) => showSnackbar(message, 'error'));
+            const apiError = handleApiError(error);
+            showSnackbar(apiError.message, 'error');
         }
     };
 

@@ -2,31 +2,30 @@ package com.xml.processor.config;
 
 import com.xml.processor.model.Client;
 
+/**
+ * Holds the client context for the current thread.
+ */
 public class ClientContextHolder {
-    private static final ThreadLocal<Long> CONTEXT = new ThreadLocal<>();
-    private static final ThreadLocal<Client> CLIENT_CONTEXT = new ThreadLocal<>();
-
-    public static void setClientId(Long clientId) {
-        CONTEXT.set(clientId);
-    }
-
-    public static Long getClientId() {
-        return CONTEXT.get();
-    }
+    private static final ThreadLocal<Client> CONTEXT = new ThreadLocal<>();
 
     public static void setClient(Client client) {
-        CLIENT_CONTEXT.set(client);
-        if (client != null) {
-            setClientId(client.getId());
-        }
+        CONTEXT.set(client);
     }
 
     public static Client getClient() {
-        return CLIENT_CONTEXT.get();
+        return CONTEXT.get();
+    }
+
+    public static Long getClientId() {
+        Client client = CONTEXT.get();
+        return client != null ? client.getId() : null;
     }
 
     public static void clear() {
         CONTEXT.remove();
-        CLIENT_CONTEXT.remove();
+    }
+
+    private ClientContextHolder() {
+        // Private constructor to prevent instantiation
     }
 } 

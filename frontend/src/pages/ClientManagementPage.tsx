@@ -140,6 +140,9 @@ const ClientManagementPage: React.FC = () => {
     if (!formData.code.trim()) {
       errors.code = 'Code is required';
       isValid = false;
+    } else if (!/^[A-Z0-9-_]+$/.test(formData.code.trim().toUpperCase())) {
+      errors.code = 'Code must contain only letters, numbers, hyphens, and underscores';
+      isValid = false;
     }
 
     if (!formData.status) {
@@ -155,17 +158,28 @@ const ClientManagementPage: React.FC = () => {
     if (!validateForm()) return;
 
     try {
+      const clientData = {
+        ...formData,
+        code: formData.code.trim().toUpperCase(),
+      };
+
       if (editingClient) {
-        await clientService.updateClient(editingClient.id, formData);
+        await clientService.updateClient(editingClient.id, clientData);
       } else {
-        await clientService.createClient(formData);
+        await clientService.createClient(clientData);
       }
       handleCloseDialog();
       loadClients();
       refreshClients();
-    } catch (err) {
-      const axiosError = err as any;
-      setError(axiosError.response?.data?.message || 'Failed to save client');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to save client';
+      setError(errorMessage);
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('code')) {
+        setFormErrors(prev => ({
+          ...prev,
+          code: 'This code is already in use'
+        }));
+      }
     }
   };
 
@@ -265,11 +279,11 @@ const ClientManagementPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {clients.length === 0 ? (
+                {(!clients || clients.length === 0) ? (
                   <TableRow>
                     <TableCell colSpan={5} align="center">
                       <Typography sx={{ py: 2 }}>
-                        No clients found. Click "Add Client" to create one.
+                        No clients found
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -278,7 +292,7 @@ const ClientManagementPage: React.FC = () => {
                     <TableRow key={client.id}>
                       <TableCell>{client.name}</TableCell>
                       <TableCell>{client.code}</TableCell>
-                      <TableCell>{client.description || '-'}</TableCell>
+                      <TableCell>{client.description || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
                           label={client.status}
@@ -287,19 +301,16 @@ const ClientManagementPage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(client)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteClick(client)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                        <Tooltip title="Edit">
+                          <IconButton onClick={() => handleOpenDialog(client)}>
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton onClick={() => handleDeleteClick(client)} color="error">
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))

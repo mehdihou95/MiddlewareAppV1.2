@@ -1,8 +1,12 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.model.MappingRule;
-import com.xml.processor.service.XsdService;
+import com.xml.processor.service.interfaces.XsdService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,8 +30,13 @@ public class MappingController {
     }
 
     @GetMapping("/rules")
-    public ResponseEntity<List<MappingRule>> getAllMappingRules() {
-        return ResponseEntity.ok(xsdService.getAllMappingRules());
+    public ResponseEntity<Page<MappingRule>> getAllMappingRules(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        return ResponseEntity.ok(xsdService.getAllMappingRules(pageable));
     }
 
     @PostMapping("/rules")
