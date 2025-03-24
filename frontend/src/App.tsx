@@ -18,7 +18,7 @@ import AuditLogs from './components/AuditLogs';
 import UserManagement from './components/UserManagement';
 import { useAuth } from './context/AuthContext';
 
-// Root component to handle authentication check
+// Root component to handle authentication check and default routing
 const Root: React.FC = () => {
   const { user, loading } = useAuth();
 
@@ -30,27 +30,32 @@ const Root: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return (
-    <FileUpload 
-      clientId={0}
-      interfaceId={0}
-      onUploadSuccess={(file) => console.log('Upload successful:', file)}
-      onUploadError={(error) => console.error('Upload failed:', error)}
-    />
-  );
+  // Redirect authenticated users to the clients page as the main dashboard
+  return <Navigate to="/clients" replace />;
 };
 
 const App: React.FC = () => {
+  const { user } = useAuth();
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
         <ClientInterfaceProvider>
           <Router>
-            <Navigation />
+            {/* Only show Navigation if user is authenticated */}
+            {user?.authenticated && <Navigation />}
             <Container sx={{ mt: 4 }}>
               <Routes>
-                <Route path="/login" element={<Login />} />
+                {/* Public route */}
+                <Route 
+                  path="/login" 
+                  element={
+                    user?.authenticated ? <Navigate to="/" replace /> : <Login />
+                  } 
+                />
+                
+                {/* Protected routes */}
                 <Route
                   path="/"
                   element={

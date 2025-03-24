@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Client, Interface } from '../types';
 import { clientService } from '../services/clientService';
 import { interfaceService } from '../services/interfaceService';
+import { authService } from '../services/authService';
 
 interface ClientInterfaceContextType {
   clients: Client[];
@@ -25,24 +26,42 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
   const [selectedInterface, setSelectedInterface] = useState<Interface | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
-  // Load clients on component mount
+  // Check authentication on mount
   useEffect(() => {
-    refreshClients();
+    const checkAuth = async () => {
+      const isAuth = await authService.validateToken();
+      setIsAuthenticated(isAuth);
+      if (!isAuth) {
+        // Clear all data if not authenticated
+        clearAllData();
+      }
+    };
+    checkAuth();
   }, []);
 
-  // Load interfaces when client is selected
+  // Load clients only if authenticated
   useEffect(() => {
-    if (selectedClient) {
+    if (isAuthenticated) {
+      refreshClients();
+    }
+  }, [isAuthenticated]);
+
+  // Load interfaces when client is selected and authenticated
+  useEffect(() => {
+    if (selectedClient && isAuthenticated) {
       refreshInterfaces();
     } else {
       setInterfaces([]);
       setSelectedInterface(null);
     }
-  }, [selectedClient]);
+  }, [selectedClient, isAuthenticated]);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount if authenticated
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const savedClientId = localStorage.getItem('selectedClientId');
     const savedInterfaceId = localStorage.getItem('selectedInterfaceId');
     
@@ -60,15 +79,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
           }
         } catch (error) {
           console.error('Error loading saved selections:', error);
-          // Clear invalid saved selections
-          localStorage.removeItem('selectedClientId');
-          localStorage.removeItem('selectedInterfaceId');
+          clearSavedSelections();
         }
       };
       
       loadSavedSelections();
     }
-  }, []);
+  }, [isAuthenticated]);
 
   // Save to localStorage when selections change
   useEffect(() => {
@@ -85,7 +102,31 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, [selectedClient, selectedInterface]);
 
+  const clearSavedSelections = () => {
+    localStorage.removeItem('selectedClientId');
+    localStorage.removeItem('selectedInterfaceId');
+  };
+
+  const clearAllData = () => {
+    setClients([]);
+    setInterfaces([]);
+    setSelectedClient(null);
+    setSelectedInterface(null);
+    clearSavedSelections();
+  };
+
+  const handleAuthError = (err: any) => {
+    if (err.response?.status === 401) {
+      setIsAuthenticated(false);
+      clearAllData();
+      return true;
+    }
+    return false;
+  };
+
   const refreshClients = async () => {
+    if (!isAuthenticated) return;
+    
     setLoading(true);
     try {
       const response = await clientService.getAllClients(0, 100); // Get first 100 clients for dropdown
@@ -96,21 +137,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
       if (selectedClient && !(response.content || []).find(c => c.id === selectedClient.id)) {
         setSelectedClient(null);
         setSelectedInterface(null);
-        localStorage.removeItem('selectedClientId');
-        localStorage.removeItem('selectedInterfaceId');
+        clearSavedSelections();
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
-      setError(`Failed to load clients: ${errorMessage}`);
-      console.error('Error loading clients:', err);
-      
-      // Only clear data on authentication errors
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        setClients([]);
-        setSelectedClient(null);
-        setSelectedInterface(null);
-        localStorage.removeItem('selectedClientId');
-        localStorage.removeItem('selectedInterfaceId');
+      if (!handleAuthError(err)) {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
+        setError(`Failed to load clients: ${errorMessage}`);
+        console.error('Error loading clients:', err);
       }
     } finally {
       setLoading(false);
@@ -118,7 +151,7 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
   };
 
   const refreshInterfaces = async () => {
-    if (!selectedClient) return;
+    if (!selectedClient || !isAuthenticated) return;
     
     setLoading(true);
     try {
@@ -132,15 +165,10 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
         localStorage.removeItem('selectedInterfaceId');
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load interfaces';
-      setError(`Failed to load interfaces: ${errorMessage}`);
-      console.error('Error loading interfaces:', err);
-      
-      // Only clear interface data on authentication errors
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        setInterfaces([]);
-        setSelectedInterface(null);
-        localStorage.removeItem('selectedInterfaceId');
+      if (!handleAuthError(err)) {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to load interfaces';
+        setError(`Failed to load interfaces: ${errorMessage}`);
+        console.error('Error loading interfaces:', err);
       }
     } finally {
       setLoading(false);

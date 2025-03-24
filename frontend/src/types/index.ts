@@ -8,6 +8,15 @@ export interface Client {
   updatedAt: string;
 }
 
+export interface ClientInput {
+  name: string;
+  code: string;
+  description?: string;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Interface {
   id: number;
   name: string;

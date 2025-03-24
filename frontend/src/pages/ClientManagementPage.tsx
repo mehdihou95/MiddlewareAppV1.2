@@ -31,7 +31,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { clientService } from '../services/clientService';
-import { Client } from '../types';
+import { Client, ClientInput } from '../types';
 import { useClientInterface } from '../context/ClientInterfaceContext';
 
 type Order = 'asc' | 'desc';
@@ -43,7 +43,7 @@ const ClientManagementPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState<Omit<Client, 'id'>>({
+  const [formData, setFormData] = useState<ClientInput>({
     name: '',
     code: '',
     description: '',

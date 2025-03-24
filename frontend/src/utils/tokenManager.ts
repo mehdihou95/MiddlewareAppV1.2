@@ -1,78 +1,71 @@
-import axios from 'axios';
+import api from '../config/apiConfig';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
-const TOKEN_EXPIRY_KEY = 'token_expiry';
 
 interface TokenData {
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
+    token: string;
+    refreshToken: string;
+    expiresIn: number;
 }
 
 interface RefreshResponse {
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
+    token: string;
+    refreshToken: string;
+    expiresIn: number;
 }
 
 export const tokenManager = {
-  setToken: (token: string, refreshToken: string) => {
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    
-    // Set default authorization header
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  },
+    setToken: (token: string, refreshToken: string) => {
+        localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    },
 
-  getToken: (): string | null => {
-    return sessionStorage.getItem(ACCESS_TOKEN_KEY);
-  },
+    getToken: (): string | null => {
+        return localStorage.getItem(ACCESS_TOKEN_KEY);
+    },
 
-  getRefreshToken: (): string | null => {
-    return sessionStorage.getItem(REFRESH_TOKEN_KEY);
-  },
+    getRefreshToken: (): string | null => {
+        return localStorage.getItem(REFRESH_TOKEN_KEY);
+    },
 
-  isTokenValid: (): boolean => {
-    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    const expiry = sessionStorage.getItem(TOKEN_EXPIRY_KEY);
-    
-    if (!token) {
-      return false;
-    }
-    
-    if (!expiry) {
-      return true; // If no expiry is set, assume token is valid
-    }
-    
-    return Date.now() < parseInt(expiry);
-  },
+    isTokenValid: (): boolean => {
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (!token) return false;
+        
+        try {
+            // Decode JWT to check expiration
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.exp * 1000 > Date.now();
+        } catch (e) {
+            console.error('Error validating token:', e);
+            return false;
+        }
+    },
 
-  clearToken: () => {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    sessionStorage.removeItem(TOKEN_EXPIRY_KEY);
-    delete axios.defaults.headers.common['Authorization'];
-  },
+    clearToken: () => {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+    },
 
-  refreshToken: async (): Promise<boolean> => {
-    try {
-      const refreshToken = tokenManager.getRefreshToken();
-      if (!refreshToken) {
+    refreshToken: async (): Promise<boolean> => {
+        try {
+            const refreshToken = tokenManager.getRefreshToken();
+            if (!refreshToken) {
+                return false;
+            }
+
+            const response = await api.post<RefreshResponse>('/auth/refresh', {
+                refreshToken
+            });
+
+            if (response.data.token) {
+                tokenManager.setToken(response.data.token, response.data.refreshToken);
+                return true;
+            }
+        } catch (error) {
+            console.error('Token refresh failed:', error);
+        }
         return false;
-      }
-
-      const response = await axios.post<RefreshResponse>('/api/auth/refresh', {
-        refreshToken
-      });
-
-      if (response.data.token) {
-        tokenManager.setToken(response.data.token, response.data.refreshToken);
-        return true;
-      }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
     }
-    return false;
-  }
 }; 
