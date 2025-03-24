@@ -181,19 +181,20 @@ CREATE TABLE audit_logs (
 ## 5. Security Implementation
 
 ### 5.1 Authentication
-- JWT-based authentication
-- Token expiration and refresh
+- JWT-based authentication with refresh token support
+- Access token expiration: 1 hour
+- Refresh token expiration: 24 hours
 - Password encryption using BCrypt
-- CORS configuration
+- CORS configuration for frontend access
 - CSRF protection
-- Rate limiting
+- Rate limiting for API endpoints
 
 ### 5.2 Authorization
-- Role-based access control
-- Method-level security
-- Client-specific data isolation
-- Custom security annotations
-- Permission-based access
+- Role-based access control (ADMIN, USER roles)
+- Method-level security with @PreAuthorize
+- Client-specific data isolation using ClientContextHolder
+- Custom security annotations for endpoint protection
+- Permission-based access with Spring Security
 
 ### 5.3 Data Security
 - HTTPS encryption
@@ -226,12 +227,13 @@ CREATE TABLE audit_logs (
 ## 7. Performance Optimization
 
 ### 7.1 Caching
-- Interface schemas
-- Mapping rules
-- Frequently accessed data
-- User data
+- Interface schemas caching with Caffeine
+- Mapping rules caching
+- User authentication data
 - Client configurations
-- Validation results
+- Token validation results
+- Maximum cache size: 500 entries
+- Cache expiration: 10 minutes after last access
 
 ### 7.2 Database
 - Index optimization
@@ -252,13 +254,14 @@ CREATE TABLE audit_logs (
 ## 8. Monitoring and Logging
 
 ### 8.1 Application Metrics
-- Response times
-- Error rates
-- Processing times
-- Resource usage
-- Cache hit rates
-- Database performance
-- System health
+- Response times for API endpoints
+- Error rates and types
+- Processing times for XML files
+- Resource usage monitoring
+- Cache hit/miss rates
+- Database query performance
+- Authentication success/failure rates
+- Token refresh statistics
 
 ### 8.2 Logging
 - Log levels

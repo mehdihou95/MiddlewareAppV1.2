@@ -97,14 +97,14 @@ npm start
 ## Default Users
 
 The application comes with predefined users:
-- Admin: username: `admin`, password: `admin123`
+- Admin: username: `admin`, password: `admin`
   - Full system access
   - Client management
   - Interface configuration
   - User management
   - Audit log access
   - System monitoring
-- Client User: username: `user`, password: `user123`
+- Client User: username: `user`, password: `user`
   - Client-specific access
   - File processing
   - Mapping rule management
@@ -157,20 +157,21 @@ The application comes with predefined users:
 File: `backend/src/main/resources/application.properties`
 ```properties
 # Database Configuration
-spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.url=jdbc:h2:file:./data/middleware
 spring.datasource.username=sa
 spring.datasource.password=password
 
 # JPA Configuration
-spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 
 # Server Configuration
 server.port=8080
 
 # JWT Configuration
-jwt.secret=${JWT_SECRET_KEY}
-jwt.expiration=86400000
+jwt.secret=your_jwt_secret_key
+jwt.expiration=3600000
+jwt.refresh-token.expiration=86400000
 
 # File Upload Configuration
 spring.servlet.multipart.max-file-size=100MB
@@ -189,7 +190,8 @@ logging.level.com.xml.processor=DEBUG
 File: `frontend/.env`
 ```properties
 REACT_APP_API_URL=http://localhost:8080/api
-REACT_APP_JWT_EXPIRATION=86400000
+REACT_APP_JWT_EXPIRATION=3600000
+REACT_APP_REFRESH_TOKEN_EXPIRATION=86400000
 ```
 
 ## Documentation
@@ -248,3 +250,6 @@ Frontend (⏳): Starting on http://localhost:3000
 React development server starting
 Will automatically open in your default browser
 Connected to backend at http://localhost:8080
+
+run this command on powershell : cd backend; mvn spring-boot:run
+run this command on powershell : cd frontend; npm start

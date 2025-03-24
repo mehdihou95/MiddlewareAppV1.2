@@ -23,19 +23,25 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 ## 3. Core Features
 
 ### 3.1 User Authentication and Authorization
-- JWT-based authentication
-- Role-based access control
-- Multi-tenant data isolation
-- Session management
-- Token refresh mechanism
-- Password encryption
+- JWT-based authentication with separate access and refresh tokens
+- Access token lifetime: 1 hour
+- Refresh token lifetime: 24 hours
+- Role-based access control (ADMIN, USER)
+- Multi-tenant data isolation using client context
+- Automatic token refresh mechanism
+- Session invalidation on logout
+- Password encryption with BCrypt
+- Failed login attempt tracking
 
 ### 3.2 Client Management
-- Create and manage client profiles
-- Configure client-specific settings
-- Monitor client performance
-- Manage client access and permissions
-- Client-specific audit logging
+- Create and manage client profiles with status tracking
+- Configure client-specific settings and interfaces
+- Monitor client performance metrics
+- Manage client access permissions and roles
+- Client-specific audit logging with detailed tracking
+- Client data isolation enforcement
+- Automatic client status updates
+- Client interface version management
 
 ### 3.3 XML Processing
 - Upload XML files
@@ -124,13 +130,16 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 - Comprehensive error handling
 
 ### 5.2 Security
-- Data isolation between clients
-- Encrypted data transmission
-- Audit logging of all actions
-- Regular security assessments
-- JWT-based authentication
-- Role-based access control
-- Client-specific data isolation
+- Complete data isolation between clients using ClientContextHolder
+- Encrypted data transmission over HTTPS
+- Comprehensive audit logging of all user actions
+- Regular security assessments and monitoring
+- JWT-based authentication with token refresh
+- Role-based access control (ADMIN, USER)
+- Client-specific data isolation at service layer
+- Password security with BCrypt encryption
+- Session management with token invalidation
+- Rate limiting for API endpoints
 
 ### 5.3 Performance
 - Process files within 30 seconds
