@@ -48,6 +48,8 @@ const ClientManagementPage: React.FC = () => {
     code: '',
     description: '',
     status: 'ACTIVE',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   });
   const [formErrors, setFormErrors] = useState({
     name: '',
@@ -95,6 +97,8 @@ const ClientManagementPage: React.FC = () => {
         code: client.code,
         description: client.description || '',
         status: client.status,
+        createdAt: client.createdAt,
+        updatedAt: new Date().toISOString()
       });
     } else {
       setEditingClient(null);
@@ -103,6 +107,8 @@ const ClientManagementPage: React.FC = () => {
         code: '',
         description: '',
         status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     }
     setOpenDialog(true);
@@ -116,6 +122,8 @@ const ClientManagementPage: React.FC = () => {
       code: '',
       description: '',
       status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
     setFormErrors({
       name: '',

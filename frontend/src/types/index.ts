@@ -4,8 +4,8 @@ export interface Client {
   code: string;
   description?: string;
   status: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Interface {
@@ -66,8 +66,8 @@ export interface User {
   lastName: string;
   enabled: boolean;
   roles: string[];
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
   lastLogin?: string;
   failedLoginAttempts?: number;
   accountLocked: boolean;
@@ -78,11 +78,7 @@ export interface User {
 export interface PageResponse<T> {
   content: T[];
   pageable: {
-    sort: {
-      sorted: boolean;
-      unsorted: boolean;
-      empty: boolean;
-    };
+    sort: Sort;
     pageNumber: number;
     pageSize: number;
     offset: number;
@@ -93,15 +89,25 @@ export interface PageResponse<T> {
   totalPages: number;
   last: boolean;
   first: boolean;
-  sort: {
-    sorted: boolean;
-    unsorted: boolean;
-    empty: boolean;
-  };
+  sort: Sort;
   numberOfElements: number;
   size: number;
   number: number;
   empty: boolean;
+}
+
+export interface Sort {
+  sorted: boolean;
+  unsorted: boolean;
+  empty: boolean;
+}
+
+export interface ErrorResponse {
+  status: number;
+  error: string;
+  message: string;
+  timestamp: string;
+  details?: string[];
 }
 
 export interface AuditLog {

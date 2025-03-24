@@ -188,7 +188,20 @@ const InterfaceManagementPage: React.FC = () => {
       if (editingInterface) {
         await interfaceService.updateInterface(editingInterface.id, backendInterfaceData);
       } else {
-        await interfaceService.createInterface(backendInterfaceData, selectedClient.id);
+        // Create a new interface without createdAt and updatedAt
+        const newInterface = {
+          name: backendInterfaceData.name,
+          type: backendInterfaceData.type,
+          description: backendInterfaceData.description,
+          isActive: backendInterfaceData.isActive,
+          priority: backendInterfaceData.priority,
+          rootElement: backendInterfaceData.rootElement,
+          namespace: backendInterfaceData.namespace,
+          schemaPath: backendInterfaceData.schemaPath,
+          status: backendInterfaceData.status,
+          clientId: backendInterfaceData.clientId
+        };
+        await interfaceService.createInterface(newInterface, selectedClient.id);
       }
       handleCloseDialog();
       loadInterfaces();

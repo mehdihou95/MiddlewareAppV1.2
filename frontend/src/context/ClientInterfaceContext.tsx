@@ -103,12 +103,15 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
       const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
       setError(`Failed to load clients: ${errorMessage}`);
       console.error('Error loading clients:', err);
-      // Clear selections on error
-      setClients([]);
-      setSelectedClient(null);
-      setSelectedInterface(null);
-      localStorage.removeItem('selectedClientId');
-      localStorage.removeItem('selectedInterfaceId');
+      
+      // Only clear data on authentication errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setClients([]);
+        setSelectedClient(null);
+        setSelectedInterface(null);
+        localStorage.removeItem('selectedClientId');
+        localStorage.removeItem('selectedInterfaceId');
+      }
     } finally {
       setLoading(false);
     }
@@ -132,9 +135,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
       const errorMessage = err.response?.data?.message || err.message || 'Failed to load interfaces';
       setError(`Failed to load interfaces: ${errorMessage}`);
       console.error('Error loading interfaces:', err);
-      setInterfaces([]);
-      setSelectedInterface(null);
-      localStorage.removeItem('selectedInterfaceId');
+      
+      // Only clear interface data on authentication errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setInterfaces([]);
+        setSelectedInterface(null);
+        localStorage.removeItem('selectedInterfaceId');
+      }
     } finally {
       setLoading(false);
     }

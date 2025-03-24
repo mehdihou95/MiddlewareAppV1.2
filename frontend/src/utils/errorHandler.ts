@@ -1,43 +1,58 @@
 import axios from 'axios';
+import { ErrorResponse } from '../types';
 
-export interface ApiError {
-    message: string;
-    code?: string;
-    details?: any;
+export class ApiError extends Error {
+    status: number;
+    details?: string[];
+
+    constructor(message: string, status: number, details?: string[]) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.details = details;
+    }
 }
 
-interface AxiosErrorResponse {
-    response?: {
-        data?: {
-            message?: string;
-            [key: string]: any;
-        };
-        status?: number;
-    };
-    message: string;
-}
+const isAxiosError = (error: unknown): boolean => {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'isAxiosError' in error &&
+        (error as { isAxiosError: boolean }).isAxiosError === true
+    );
+};
 
 export const handleApiError = (error: unknown): ApiError => {
-    if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as AxiosErrorResponse;
-        return {
-            message: axiosError.response?.data?.message || axiosError.message,
-            code: axiosError.response?.status?.toString(),
-            details: axiosError.response?.data
-        };
+    if (error instanceof ApiError) {
+        return error;
+    }
+
+    if (isAxiosError(error)) {
+        const axiosError = error as any;
+        const response = axiosError.response?.data as ErrorResponse;
+        return new ApiError(
+            response?.message || axiosError.message || 'An unexpected error occurred',
+            axiosError.response?.status || 500,
+            response?.details
+        );
     }
 
     if (error instanceof Error) {
-        return {
-            message: error.message,
-            code: 'UNKNOWN_ERROR'
-        };
+        return new ApiError(error.message, 500);
     }
 
-    return {
-        message: 'An unexpected error occurred',
-        code: 'UNKNOWN_ERROR'
-    };
+    return new ApiError('An unexpected error occurred', 500);
+};
+
+export const isAuthenticationError = (error: unknown): boolean => {
+    if (error instanceof ApiError) {
+        return error.status === 401 || error.status === 403;
+    }
+    if (isAxiosError(error)) {
+        const axiosError = error as any;
+        return axiosError.response?.status === 401 || axiosError.response?.status === 403;
+    }
+    return false;
 };
 
 export const isApiError = (error: unknown): error is ApiError => {
@@ -48,12 +63,6 @@ export const isApiError = (error: unknown): error is ApiError => {
         typeof (error as ApiError).message === 'string'
     );
 };
-
-export interface ErrorResponse {
-    status: number;
-    message: string;
-    validationErrors?: string[];
-}
 
 export const handleApiErrorOld = (error: unknown, setError: (message: string) => void) => {
     if (error && typeof error === 'object' && 'response' in error) {

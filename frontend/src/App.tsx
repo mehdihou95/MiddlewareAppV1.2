@@ -16,6 +16,29 @@ import { AuthProvider } from './context/AuthContext';
 import { ClientInterfaceProvider } from './context/ClientInterfaceContext';
 import AuditLogs from './components/AuditLogs';
 import UserManagement from './components/UserManagement';
+import { useAuth } from './context/AuthContext';
+
+// Root component to handle authentication check
+const Root: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!user || !user.authenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <FileUpload 
+      clientId={0}
+      interfaceId={0}
+      onUploadSuccess={(file) => console.log('Upload successful:', file)}
+      onUploadError={(error) => console.error('Upload failed:', error)}
+    />
+  );
+};
 
 const App: React.FC = () => {
   return (
@@ -27,20 +50,12 @@ const App: React.FC = () => {
             <Navigation />
             <Container sx={{ mt: 4 }}>
               <Routes>
-                <Route 
-                  path="/login" 
-                  element={<Login />} 
-                />
+                <Route path="/login" element={<Login />} />
                 <Route
                   path="/"
                   element={
                     <PrivateRoute>
-                      <FileUpload 
-                        clientId={0}
-                        interfaceId={0}
-                        onUploadSuccess={(file) => console.log('Upload successful:', file)}
-                        onUploadError={(error) => console.error('Upload failed:', error)}
-                      />
+                      <Root />
                     </PrivateRoute>
                   }
                 />
@@ -76,8 +91,22 @@ const App: React.FC = () => {
                     </PrivateRoute>
                   }
                 />
-                <Route path="/audit-logs" element={<AuditLogs />} />
-                <Route path="/users" element={<UserManagement />} />
+                <Route 
+                  path="/audit-logs" 
+                  element={
+                    <PrivateRoute>
+                      <AuditLogs />
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/users" 
+                  element={
+                    <PrivateRoute>
+                      <UserManagement />
+                    </PrivateRoute>
+                  } 
+                />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Container>

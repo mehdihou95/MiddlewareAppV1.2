@@ -67,11 +67,17 @@ public class AuthController {
             
             if (jwtService.isTokenValid(request.getRefreshToken(), userDetails)) {
                 String newToken = jwtService.generateToken(userDetails);
+                String newRefreshToken = jwtService.generateRefreshToken(userDetails);
                 
-                return ResponseEntity.ok(Map.of(
-                    "token", newToken,
-                    "username", userDetails.getUsername()
-                ));
+                Map<String, Object> response = new HashMap<>();
+                response.put("token", newToken);
+                response.put("refreshToken", newRefreshToken);
+                response.put("username", userDetails.getUsername());
+                response.put("roles", userDetails.getAuthorities().stream()
+                    .map(auth -> auth.getAuthority().replace("ROLE_", ""))
+                    .collect(Collectors.toList()));
+                
+                return ResponseEntity.ok(response);
             }
             
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -88,6 +94,22 @@ public class AuthController {
             @RequestParam("username") String username,
             @RequestParam("password") String password) {
         return login(new LoginRequest(username, password));
+    }
+
+    @GetMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateToken(Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", true);
+            response.put("username", userDetails.getUsername());
+            response.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority().replace("ROLE_", ""))
+                .collect(Collectors.toList()));
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(Map.of("valid", false, "error", "Invalid or expired token"));
     }
 }
 
