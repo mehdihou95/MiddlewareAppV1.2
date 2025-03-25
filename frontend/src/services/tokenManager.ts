@@ -30,13 +30,34 @@ export const tokenManager = {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
     },
 
-    isTokenValid: (token: string): boolean => {
+    isTokenValid: (providedToken?: string): boolean => {
+        const token = providedToken || localStorage.getItem(ACCESS_TOKEN_KEY);
         if (!token) return false;
         
         try {
+            // Decode JWT to check expiration
             const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.exp * 1000 > Date.now();
+            
+            // Check if token has required fields
+            if (!payload || typeof payload.exp !== 'number') {
+                console.error('Invalid token format: missing or invalid expiration');
+                return false;
+            }
+
+            // Add buffer time (5 minutes) to prevent edge cases
+            const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+            const currentTime = Date.now();
+            const expirationTime = payload.exp * 1000; // Convert to milliseconds
+
+            // Check if token is expired or will expire within buffer time
+            if (expirationTime <= currentTime + bufferTime) {
+                console.warn('Token is expired or will expire soon');
+                return false;
+            }
+
+            return true;
         } catch (e) {
+            console.error('Error validating token:', e);
             return false;
         }
     },

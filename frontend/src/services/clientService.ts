@@ -3,8 +3,6 @@ import { Client, ClientInput, Interface, PageResponse } from '../types';
 import { handleApiError } from '../utils/errorHandler';
 import { setClientContext } from '../utils/clientContext';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
-
 interface ClientResponse {
     content: Client[];
     totalElements: number;
@@ -21,14 +19,21 @@ interface ClientOnboardingData {
 
 export const clientService = {
     getAllClients: async (page = 0, size = 10, sortBy = 'name', direction = 'asc'): Promise<ClientResponse> => {
-        const response = await api.get<ClientResponse>('/clients', {
-            params: {
-                page,
-                size,
-                sort: `${sortBy},${direction}`
-            }
-        });
-        return response.data;
+        try {
+            console.log('Fetching clients with params:', { page, size, sortBy, direction });
+            const response = await api.get<ClientResponse>('/clients', {
+                params: {
+                    page,
+                    size,
+                    sort: `${sortBy},${direction}`
+                }
+            });
+            console.log('Client response:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+            throw error;
+        }
     },
 
     getClientById: async (id: number): Promise<Client> => {

@@ -33,14 +33,21 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { clientService } from '../services/clientService';
 import { Client, ClientInput } from '../types';
 import { useClientInterface } from '../context/ClientInterfaceContext';
+import { ClientDialog, ConfirmDialog } from '../components';
+import { debounce } from 'lodash';
 
 type Order = 'asc' | 'desc';
 
-const ClientManagementPage: React.FC = () => {
-  const { refreshClients } = useClientInterface();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export const ClientManagementPage: React.FC = () => {
+  const { 
+    clients, 
+    loading, 
+    error, 
+    refreshClients, 
+    hasRole, 
+    setError,
+    isAuthenticated 
+  } = useClientInterface();
   const [openDialog, setOpenDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState<ClientInput>({
@@ -56,38 +63,41 @@ const ClientManagementPage: React.FC = () => {
     code: '',
     status: '',
   });
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [orderBy, setOrderBy] = useState<keyof Client>('name');
   const [order, setOrder] = useState<Order>('asc');
 
-  useEffect(() => {
-    loadClients();
-  }, [page, rowsPerPage, orderBy, order]);
+  // Memoize and debounce the loadClients function
+  const debouncedLoadClients = React.useMemo(
+    () =>
+      debounce(async () => {
+        if (!isAuthenticated) return;
+        
+        try {
+          const response = await refreshClients(page, rowsPerPage, orderBy, order);
+          if (response) {
+            setTotalCount(response.totalElements || 0);
+          }
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
+          setError(errorMessage);
+        }
+      }, 300),
+    [page, rowsPerPage, orderBy, order, refreshClients, setError, isAuthenticated]
+  );
 
-  const loadClients = async () => {
-    try {
-      setLoading(true);
-      const response = await clientService.getAllClients(
-        page,
-        rowsPerPage,
-        orderBy,
-        order
-      );
-      
-      setClients(response.content);
-      setTotalCount(response.totalElements);
-      setError(null);
-    } catch (err) {
-      const axiosError = err as any;
-      setError(axiosError.response?.data?.message || 'Failed to load clients');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use the debounced function in useEffect
+  useEffect(() => {
+    debouncedLoadClients();
+    // Cleanup
+    return () => {
+      debouncedLoadClients.cancel();
+    };
+  }, [debouncedLoadClients]);
 
   const handleOpenDialog = (client?: Client) => {
     if (client) {
@@ -177,8 +187,7 @@ const ClientManagementPage: React.FC = () => {
         await clientService.createClient(clientData);
       }
       handleCloseDialog();
-      loadClients();
-      refreshClients();
+      await refreshClients();
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to save client';
       setError(errorMessage);
@@ -193,7 +202,7 @@ const ClientManagementPage: React.FC = () => {
 
   const handleDeleteClick = (client: Client) => {
     setClientToDelete(client);
-    setDeleteDialogOpen(true);
+    setDeleteConfirmOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -201,14 +210,18 @@ const ClientManagementPage: React.FC = () => {
 
     try {
       await clientService.deleteClient(clientToDelete.id);
-      setDeleteDialogOpen(false);
+      setDeleteConfirmOpen(false);
       setClientToDelete(null);
-      loadClients();
-      refreshClients();
-    } catch (err) {
-      const axiosError = err as any;
-      setError(axiosError.response?.data?.message || 'Failed to delete client');
+      await refreshClients();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete client';
+      setError(errorMessage);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+    setClientToDelete(null);
   };
 
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -230,18 +243,25 @@ const ClientManagementPage: React.FC = () => {
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Client Management</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Client
-        </Button>
+        {hasRole('ADMIN') && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Client
+          </Button>
+        )}
       </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+          {error.includes('permission') && !hasRole('ADMIN') && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              You need administrator privileges to manage clients.
+            </Typography>
+          )}
         </Alert>
       )}
 
@@ -309,16 +329,20 @@ const ClientManagementPage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Tooltip title="Edit">
-                          <IconButton onClick={() => handleOpenDialog(client)}>
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton onClick={() => handleDeleteClick(client)} color="error">
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
+                        {hasRole('ADMIN') && (
+                          <>
+                            <Tooltip title="Edit">
+                              <IconButton onClick={() => handleOpenDialog(client)}>
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton onClick={() => handleDeleteClick(client)} color="error">
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -329,91 +353,30 @@ const ClientManagementPage: React.FC = () => {
 
           <TablePagination
             component="div"
-            count={totalCount}
+            count={totalCount || 0}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
+            labelDisplayedRows={({ from, to, count }) => 
+              `${from}–${to} of ${count !== -1 ? count : 'more than ' + to}`
+            }
           />
 
-          {/* Create/Edit Dialog */}
-          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-            <DialogTitle>
-              {editingClient ? 'Edit Client' : 'Add New Client'}
-            </DialogTitle>
-            <DialogContent>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                <TextField
-                  label="Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  error={!!formErrors.name}
-                  helperText={formErrors.name}
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Code"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  error={!!formErrors.code}
-                  helperText={formErrors.code}
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  multiline
-                  rows={3}
-                  fullWidth
-                />
-                <FormControl fullWidth>
-                  <InputLabel required>Status</InputLabel>
-                  <Select
-                    value={formData.status}
-                    label="Status"
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as Client['status'] })}
-                    error={!!formErrors.status}
-                  >
-                    <MenuItem value="ACTIVE">Active</MenuItem>
-                    <MenuItem value="INACTIVE">Inactive</MenuItem>
-                    <MenuItem value="SUSPENDED">Suspended</MenuItem>
-                  </Select>
-                  {formErrors.status && (
-                    <Typography color="error" variant="caption">
-                      {formErrors.status}
-                    </Typography>
-                  )}
-                </FormControl>
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseDialog}>Cancel</Button>
-              <Button onClick={handleSubmit} variant="contained">
-                {editingClient ? 'Update' : 'Create'}
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <ClientDialog
+            open={openDialog}
+            onClose={handleCloseDialog}
+            onSubmit={handleSubmit}
+            client={editingClient}
+          />
 
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-            <DialogTitle>Confirm Delete</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete the client "{clientToDelete?.name}"?
-                This action cannot be undone.
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onClose={handleDeleteCancel}
+            onConfirm={handleDeleteConfirm}
+            title="Delete Client"
+            content={`Are you sure you want to delete ${clientToDelete?.name}?`}
+          />
         </>
       )}
     </Box>

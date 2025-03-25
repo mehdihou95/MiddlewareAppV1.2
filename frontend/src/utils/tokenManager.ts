@@ -1,6 +1,6 @@
 import api from '../config/apiConfig';
 
-const ACCESS_TOKEN_KEY = 'access_token';
+const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 interface TokenData {
@@ -17,20 +17,25 @@ interface RefreshResponse {
 
 export const tokenManager = {
     setToken: (token: string, refreshToken: string) => {
-        localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        console.log('Setting new tokens');
+        localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     },
 
     getToken: (): string | null => {
-        return localStorage.getItem(ACCESS_TOKEN_KEY);
+        const token = localStorage.getItem(TOKEN_KEY);
+        console.log('Getting token:', token ? 'Token exists' : 'No token found');
+        return token;
     },
 
     getRefreshToken: (): string | null => {
-        return localStorage.getItem(REFRESH_TOKEN_KEY);
+        const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+        console.log('Getting refresh token:', refreshToken ? 'Refresh token exists' : 'No refresh token found');
+        return refreshToken;
     },
 
     isTokenValid: (): boolean => {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        const token = localStorage.getItem(TOKEN_KEY);
         if (!token) return false;
         
         try {
@@ -44,7 +49,8 @@ export const tokenManager = {
     },
 
     clearToken: () => {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        console.log('Clearing all tokens');
+        localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_TOKEN_KEY);
     },
 
@@ -67,5 +73,11 @@ export const tokenManager = {
             console.error('Token refresh failed:', error);
         }
         return false;
+    },
+
+    hasToken: (): boolean => {
+        const hasToken = !!localStorage.getItem(TOKEN_KEY);
+        console.log('Checking if token exists:', hasToken);
+        return hasToken;
     }
 }; 

@@ -20,29 +20,37 @@ interface RefreshTokenResponse {
     refreshToken: string;
 }
 
+interface ValidateTokenResponse {
+    valid: boolean;
+    username: string;
+    roles: string[];
+}
+
 export const authService = {
-    login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    login: async (username: string, password: string): Promise<LoginResponse> => {
+        console.log('Attempting login for user:', username);
         try {
-            const response = await api.post<LoginResponse>('/auth/login', credentials);
-            const { token, refreshToken } = response.data;
-            tokenManager.setToken(token, refreshToken);
+            const response = await api.post<LoginResponse>('/auth/login', { username, password });
+            console.log('Login successful, storing tokens');
+            tokenManager.setToken(response.data.token, response.data.refreshToken);
             return response.data;
         } catch (error) {
-            throw handleApiError(error);
+            console.error('Login failed:', error);
+            throw error;
         }
     },
 
     logout: async (): Promise<void> => {
+        console.log('Logging out user');
         try {
-            // Since there's no logout endpoint, we'll just clear tokens locally
+            await api.post('/auth/logout');
+            console.log('Logout successful, clearing tokens');
             tokenManager.clearToken();
-            resetAxiosDefaults();
-            // Only redirect if not already on login page
-            if (!window.location.pathname.includes('/login')) {
-                window.location.href = '/login';
-            }
         } catch (error) {
-            console.error('Logout error:', error);
+            console.error('Logout failed:', error);
+            // Clear tokens anyway
+            tokenManager.clearToken();
+            throw error;
         }
     },
 
@@ -50,38 +58,57 @@ export const authService = {
         return tokenManager.isTokenValid();
     },
 
-    refreshToken: async (): Promise<boolean> => {
+    refreshToken: async (): Promise<string> => {
+        const refreshToken = tokenManager.getRefreshToken();
+        console.log('Attempting to refresh token');
+        
+        if (!refreshToken) {
+            console.error('No refresh token available');
+            throw new Error('No refresh token available');
+        }
+
         try {
-            const refreshToken = tokenManager.getRefreshToken();
-            if (!refreshToken) {
-                return false;
-            }
-
-            const response = await api.post<RefreshTokenResponse>('/auth/refresh', {
-                refreshToken
+            const response = await api.post<LoginResponse>('/auth/refresh', {
+                refreshToken: refreshToken
             });
-
-            const { token, refreshToken: newRefreshToken } = response.data;
-            tokenManager.setToken(token, newRefreshToken);
-            return true;
+            console.log('Token refresh successful');
+            tokenManager.setToken(response.data.token, response.data.refreshToken);
+            return response.data.token;
         } catch (error) {
             console.error('Token refresh failed:', error);
-            return false;
+            tokenManager.clearToken();
+            throw error;
         }
     },
 
-    validateToken: async (): Promise<boolean> => {
+    validateToken: async (): Promise<ValidateTokenResponse> => {
+        const token = tokenManager.getToken();
+        console.log('Validating token:', token ? 'Token exists' : 'No token found');
+        
+        if (!token) {
+            return {
+                valid: false,
+                username: '',
+                roles: []
+            };
+        }
+        
         try {
-            const token = tokenManager.getToken();
-            if (!token) {
-                return false;
-            }
-
-            const response = await api.get('/auth/validate');
-            return response.status === 200;
+            const response = await api.post<ValidateTokenResponse>('/auth/validate', {
+                token: token
+            });
+            console.log('Token validation response:', response.data);
+            return {
+                ...response.data,
+                valid: true
+            };
         } catch (error) {
             console.error('Token validation failed:', error);
-            return false;
+            return {
+                valid: false,
+                username: '',
+                roles: []
+            };
         }
     },
 

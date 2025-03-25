@@ -34,91 +34,101 @@ const Root: React.FC = () => {
   return <Navigate to="/clients" replace />;
 };
 
-const App: React.FC = () => {
+// AppContent component that uses auth context
+const AppContent: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <>
+      {/* Only show Navigation if user is authenticated */}
+      {user?.authenticated && <Navigation />}
+      <Container sx={{ mt: 4 }}>
+        <Routes>
+          {/* Public route */}
+          <Route 
+            path="/login" 
+            element={
+              user?.authenticated ? <Navigate to="/" replace /> : <Login />
+            } 
+          />
+          
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <Root />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <PrivateRoute>
+                <ProcessedFiles />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/transform"
+            element={
+              <PrivateRoute>
+                <TransformPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/clients"
+            element={
+              <PrivateRoute>
+                <ClientManagementPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/interfaces"
+            element={
+              <PrivateRoute>
+                <InterfaceManagementPage />
+              </PrivateRoute>
+            }
+          />
+          <Route 
+            path="/audit-logs" 
+            element={
+              <PrivateRoute>
+                <AuditLogs />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/users" 
+            element={
+              <PrivateRoute>
+                <UserManagement />
+              </PrivateRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Container>
+    </>
+  );
+};
+
+// Main App component
+const App: React.FC = () => {
+  return (
+    <Router>
       <AuthProvider>
-        <ClientInterfaceProvider>
-          <Router>
-            {/* Only show Navigation if user is authenticated */}
-            {user?.authenticated && <Navigation />}
-            <Container sx={{ mt: 4 }}>
-              <Routes>
-                {/* Public route */}
-                <Route 
-                  path="/login" 
-                  element={
-                    user?.authenticated ? <Navigate to="/" replace /> : <Login />
-                  } 
-                />
-                
-                {/* Protected routes */}
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute>
-                      <Root />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/history"
-                  element={
-                    <PrivateRoute>
-                      <ProcessedFiles />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/transform"
-                  element={
-                    <PrivateRoute>
-                      <TransformPage />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/clients"
-                  element={
-                    <PrivateRoute>
-                      <ClientManagementPage />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/interfaces"
-                  element={
-                    <PrivateRoute>
-                      <InterfaceManagementPage />
-                    </PrivateRoute>
-                  }
-                />
-                <Route 
-                  path="/audit-logs" 
-                  element={
-                    <PrivateRoute>
-                      <AuditLogs />
-                    </PrivateRoute>
-                  } 
-                />
-                <Route 
-                  path="/users" 
-                  element={
-                    <PrivateRoute>
-                      <UserManagement />
-                    </PrivateRoute>
-                  } 
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Container>
-          </Router>
-        </ClientInterfaceProvider>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <ClientInterfaceProvider>
+            <AppContent />
+          </ClientInterfaceProvider>
+        </ThemeProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </Router>
   );
 };
 

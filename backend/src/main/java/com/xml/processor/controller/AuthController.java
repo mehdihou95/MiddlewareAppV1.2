@@ -2,6 +2,8 @@ package com.xml.processor.controller;
 
 import com.xml.processor.config.JwtService;
 import com.xml.processor.model.RefreshTokenRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,12 +15,15 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+    
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
@@ -101,15 +106,30 @@ public class AuthController {
         if (authentication != null && authentication.isAuthenticated()) {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             Map<String, Object> response = new HashMap<>();
+            
+            // Get roles from authentication
+            List<String> roles = userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority().replace("ROLE_", ""))
+                .collect(Collectors.toList());
+            
             response.put("valid", true);
             response.put("username", userDetails.getUsername());
-            response.put("roles", userDetails.getAuthorities().stream()
-                .map(auth -> auth.getAuthority().replace("ROLE_", ""))
-                .collect(Collectors.toList()));
+            response.put("roles", roles);
+            
+            // Log roles for debugging
+            logger.info("User {} validated with roles: {}", userDetails.getUsername(), roles);
+            
             return ResponseEntity.ok(response);
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .body(Map.of("valid", false, "error", "Invalid or expired token"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout() {
+        // Since we're using JWT, we don't need server-side logout
+        // Just return success so the frontend knows the request was received
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }
 
