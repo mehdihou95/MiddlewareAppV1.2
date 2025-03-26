@@ -1,5 +1,6 @@
 package com.xml.processor.config;
 
+import com.xml.processor.service.impl.JwtBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final JwtBlacklistService jwtBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -52,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
                 
-                if (jwtService.isTokenValid(jwt, userDetails)) {
+                if (jwtService.isTokenValid(jwt, userDetails) && !jwtBlacklistService.isBlacklisted(jwt)) {
                     log.info("Valid token for user: {}", userEmail);
                     
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -63,7 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 } else {
-                    log.warn("Invalid token for user: {}", userEmail);
+                    log.warn("Invalid or blacklisted token for user: {}", userEmail);
                 }
             }
         } catch (Exception e) {

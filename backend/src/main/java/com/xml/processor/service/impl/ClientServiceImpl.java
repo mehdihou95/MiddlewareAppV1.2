@@ -3,6 +3,8 @@ package com.xml.processor.service.impl;
 import com.xml.processor.model.Client;
 import com.xml.processor.repository.ClientRepository;
 import com.xml.processor.service.interfaces.ClientService;
+import jakarta.validation.ValidationException;
+import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,12 +12,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ClientServiceImpl implements ClientService {
 
+    private final ClientRepository clientRepository;
+    private final Validator validator;
+
     @Autowired
-    private ClientRepository clientRepository;
+    public ClientServiceImpl(ClientRepository clientRepository, Validator validator) {
+        this.clientRepository = clientRepository;
+        this.validator = validator;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -26,9 +35,26 @@ public class ClientServiceImpl implements ClientService {
     @Override
     @Transactional
     public Client saveClient(Client client) {
-        if (clientRepository.existsByName(client.getName())) {
-            throw new IllegalArgumentException("Client with name " + client.getName() + " already exists");
+        // Validation with Bean Validation
+        var violations = validator.validate(client);
+        if (!violations.isEmpty()) {
+            throw new ValidationException(violations.stream()
+                .map(violation -> violation.getMessage())
+                .collect(Collectors.joining(", ")));
         }
+        
+        // Specific validation for name uniqueness
+        if (clientRepository.existsByName(client.getName()) && 
+            (client.getId() == null || !clientRepository.findById(client.getId()).get().getName().equals(client.getName()))) {
+            throw new ValidationException("Client with name " + client.getName() + " already exists");
+        }
+        
+        // Specific validation for code uniqueness
+        if (clientRepository.existsByCode(client.getCode()) && 
+            (client.getId() == null || !clientRepository.findById(client.getId()).get().getCode().equals(client.getCode()))) {
+            throw new ValidationException("Client with code " + client.getCode() + " already exists");
+        }
+        
         return clientRepository.save(client);
     }
 
@@ -55,15 +81,15 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Client> getClients(Pageable pageable, String nameFilter, String statusFilter) {
-        if (nameFilter != null && !nameFilter.isEmpty() && statusFilter != null && !statusFilter.isEmpty()) {
-            return clientRepository.findByNameContainingIgnoreCaseAndStatus(nameFilter, statusFilter, pageable);
-        } else if (nameFilter != null && !nameFilter.isEmpty()) {
-            return clientRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
-        } else if (statusFilter != null && !statusFilter.isEmpty()) {
-            return clientRepository.findByStatus(statusFilter, pageable);
+    public Page<Client> getClients(Pageable pageable, String filter, String status) {
+        if (status != null && !status.isEmpty()) {
+            return clientRepository.findByStatus(status, pageable);
         }
-
+        
+        if (filter != null && !filter.isEmpty()) {
+            return clientRepository.findByNameContainingIgnoreCase(filter, pageable);
+        }
+        
         return clientRepository.findAll(pageable);
     }
 

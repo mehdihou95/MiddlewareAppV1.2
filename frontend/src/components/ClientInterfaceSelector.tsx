@@ -36,14 +36,18 @@ const ClientInterfaceSelector: React.FC<ClientInterfaceSelectorProps> = ({
 
   const handleClientChange = (event: any) => {
     const clientId = event.target.value;
-    const client = clients.find(c => c.id === clientId) || null;
-    setSelectedClient(client);
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setSelectedClient(client);
+    }
   };
 
   const handleInterfaceChange = (event: any) => {
     const interfaceId = event.target.value;
-    const interfaceObj = interfaces.find(i => i.id === interfaceId) || null;
-    setSelectedInterface(interfaceObj);
+    const interfaceObj = interfaces.find(i => i.id === interfaceId);
+    if (interfaceObj) {
+      setSelectedInterface(interfaceObj);
+    }
   };
 
   const navigateToClientManagement = () => {

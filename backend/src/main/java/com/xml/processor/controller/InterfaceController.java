@@ -1,84 +1,167 @@
 package com.xml.processor.controller;
 
-import com.xml.processor.exception.ResourceNotFoundException;
-import com.xml.processor.exception.ValidationException;
 import com.xml.processor.model.Interface;
+import com.xml.processor.model.ErrorResponse;
 import com.xml.processor.service.interfaces.InterfaceService;
+import com.xml.processor.validation.InterfaceValidator;
+import jakarta.validation.ValidationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
+import java.util.List;
 
+/**
+ * REST controller for managing interfaces.
+ * Provides endpoints for CRUD operations and interface-specific functionality.
+ */
 @RestController
 @RequestMapping("/api/interfaces")
 public class InterfaceController {
 
     private final InterfaceService interfaceService;
+    private final InterfaceValidator interfaceValidator;
 
-    public InterfaceController(InterfaceService interfaceService) {
+    @Autowired
+    public InterfaceController(InterfaceService interfaceService, InterfaceValidator interfaceValidator) {
         this.interfaceService = interfaceService;
+        this.interfaceValidator = interfaceValidator;
     }
 
-    @GetMapping
-    public ResponseEntity<Page<Interface>> getInterfaces(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDirection,
-            @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) Boolean isActive) {
-        
+    @PostMapping
+    public ResponseEntity<?> createInterface(@RequestBody Interface interface_) {
         try {
-            Page<Interface> interfaces = interfaceService.getInterfaces(page, size, sortBy, sortDirection, searchTerm, isActive);
-            return ResponseEntity.ok(interfaces);
+            interfaceValidator.validate(interface_);
+            Interface createdInterface = interfaceService.createInterface(interface_);
+            return ResponseEntity.ok(createdInterface);
         } catch (ValidationException e) {
-            return ResponseEntity.badRequest().build();
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "VALIDATION_ERROR",
+                e.getMessage()
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while creating the interface"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Interface> getInterfaceById(@PathVariable Long id) {
+    public ResponseEntity<?> getInterface(@PathVariable Long id) {
         try {
-            Optional<Interface> interfaceOpt = interfaceService.getInterfaceById(id);
-            return interfaceOpt.map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
+            return interfaceService.getInterfaceById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while retrieving the interface"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
-    @PostMapping
-    public ResponseEntity<Interface> createInterface(@RequestBody Interface interface_) {
+    @GetMapping("/client")
+    public ResponseEntity<?> getInterfacesByCurrentClient() {
         try {
-            Interface createdInterface = interfaceService.createInterface(interface_);
-            return ResponseEntity.ok(createdInterface);
-        } catch (ValidationException e) {
-            return ResponseEntity.badRequest().build();
+            // Get the current client from the security context or ClientContextHolder
+            Long clientId = getCurrentClientId();
+            if (clientId == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            List<Interface> interfaces = interfaceService.getClientInterfaces(clientId);
+            return ResponseEntity.ok(interfaces);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while retrieving interfaces"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/client/{clientId}")
+    public ResponseEntity<?> getInterfacesByClientId(
+            @PathVariable Long clientId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection,
+            @RequestParam(required = false) String searchTerm) {
+        
+        try {
+            PageRequest pageRequest = PageRequest.of(page, size);
+            Page<Interface> interfaces = interfaceService.getInterfacesByClient(clientId, pageRequest);
+            return ResponseEntity.ok(interfaces);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while retrieving interfaces"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Interface> updateInterface(@PathVariable Long id, @RequestBody Interface interface_) {
+    public ResponseEntity<?> updateInterface(@PathVariable Long id, @RequestBody Interface interface_) {
         try {
+            interface_.setId(id);
+            interfaceValidator.validate(interface_);
             Interface updatedInterface = interfaceService.updateInterface(id, interface_);
             return ResponseEntity.ok(updatedInterface);
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
         } catch (ValidationException e) {
-            return ResponseEntity.badRequest().build();
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "VALIDATION_ERROR",
+                e.getMessage()
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while updating the interface"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteInterface(@PathVariable Long id) {
+    public ResponseEntity<?> deleteInterface(@PathVariable Long id) {
         try {
             interfaceService.deleteInterface(id);
             return ResponseEntity.ok().build();
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "NOT_FOUND",
+                e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while deleting the interface"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
+    }
+
+    private Long getCurrentClientId() {
+        // TODO: Implement getting the current client ID from security context
+        return null;
     }
 } 

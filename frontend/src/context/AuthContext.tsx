@@ -58,12 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       } else {
         setUser(null);
-        tokenManager.clearToken();
+        tokenManager.clearTokens();
       }
     } catch (err) {
       console.error('Auth check error:', err);
       setUser(null);
-      tokenManager.clearToken();
+      tokenManager.clearTokens();
     } finally {
       setLoading(false);
     }
@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      tokenManager.clearToken();
+      tokenManager.clearTokens();
       delete axios.defaults.headers.common['Authorization'];
       setUser(null);
       setError(null);

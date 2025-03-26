@@ -212,7 +212,7 @@ const Navigation = () => {
               open={Boolean(clientMenuAnchor)}
               onClose={handleClientMenuClose}
             >
-              {clients.length === 0 ? (
+              {!clients || clients.length === 0 ? (
                 <MenuItem disabled>
                   No clients available
                 </MenuItem>

@@ -1,8 +1,8 @@
 package com.xml.processor.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -23,10 +23,12 @@ public class Client {
     private String name;
 
     @NotBlank(message = "Code is required")
+    @Pattern(regexp = "^[A-Z0-9-_]+$", message = "Code must contain only letters, numbers, hyphens, and underscores")
     @Size(max = 50)
     @Column(nullable = false, unique = true)
     private String code;
 
+    @NotNull(message = "Status is required")
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private ClientStatus status = ClientStatus.ACTIVE;
@@ -34,6 +36,7 @@ public class Client {
     @Size(max = 1000)
     private String description;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Interface> interfaces = new HashSet<>();
 

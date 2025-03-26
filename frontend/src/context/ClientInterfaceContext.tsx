@@ -4,22 +4,24 @@ import { clientService } from '../services/clientService';
 import { interfaceService } from '../services/interfaceService';
 import { authService } from '../services/authService';
 import { tokenManager } from '../utils/tokenManager';
+import { useNavigate } from 'react-router-dom';
 
 interface ClientInterfaceContextType {
   clients: Client[];
   interfaces: Interface[];
   selectedClient: Client | null;
   selectedInterface: Interface | null;
-  setSelectedClient: (client: Client | null) => void;
-  setSelectedInterface: (interfaceObj: Interface | null) => void;
   loading: boolean;
   error: string | null;
-  setError: (error: string | null) => void;
-  refreshClients: (page?: number, pageSize?: number, sortField?: string, sortOrder?: 'asc' | 'desc') => Promise<any>;
-  refreshInterfaces: () => Promise<void>;
-  userRoles: string[];
-  hasRole: (role: string) => boolean;
   isAuthenticated: boolean;
+  userRoles: string[];
+  refreshClients: (page?: number, pageSize?: number, sortField?: string, sortOrder?: 'asc' | 'desc') => Promise<void>;
+  refreshInterfaces: () => Promise<void>;
+  setSelectedClient: (client: Client) => void;
+  setSelectedInterface: (interface_: Interface) => void;
+  hasRole: (role: string) => boolean;
+  setError: (error: string | null) => void;
+  setClients: (clients: Client[]) => void;
 }
 
 const ClientInterfaceContext = createContext<ClientInterfaceContextType | undefined>(undefined);
@@ -34,12 +36,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const requestRef = React.useRef<AbortController | null>(null);
+  const navigate = useNavigate();
 
   const clearAllData = () => {
     setClients([]);
-    setInterfaces([]);
+      setInterfaces([]);
     setSelectedClient(null);
-    setSelectedInterface(null);
+      setSelectedInterface(null);
     setError(null);
   };
 
@@ -75,7 +78,7 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
           setLoading(true);
           try {
             console.log('Loading initial clients...');
-            const response = await clientService.getAllClients(0, 10, 'name', 'asc');
+            const response = await clientService.getAllClients({ page: 0, size: 10, sort: 'name', direction: 'asc' });
             console.log('Initial clients loaded:', response);
             if (response && response.content) {
               setClients(response.content);
@@ -99,13 +102,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
           setIsAuthenticated(false);
           setUserRoles([]);
           clearAllData();
-          tokenManager.clearToken(); // Clear invalid token
+          tokenManager.clearTokens(); // Clear invalid token
         }
       } catch (error) {
         console.error('Auth check error:', error);
         setIsAuthenticated(false);
         clearAllData();
-        tokenManager.clearToken(); // Clear token on error
+        tokenManager.clearTokens(); // Clear token on error
       }
     };
 
@@ -126,85 +129,34 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
     sortField = 'name',
     sortOrder: 'asc' | 'desc' = 'asc'
   ) => {
-    if (!isAuthenticated) {
-      console.log('Not authenticated, skipping client refresh');
-      return;
-    }
-
-    if (loading) {
-      console.log('Already loading, skipping client refresh');
-      return;
-    }
-
-    // Cancel previous request if it exists
-    if (requestRef.current) {
-      console.log('Cancelling previous request');
-      requestRef.current.abort();
-    }
-    requestRef.current = new AbortController();
+    if (!isAuthenticated) return;
     
-    setLoading(true);
     try {
-      console.log('Making request to get all clients...', { page, pageSize, sortField, sortOrder });
-      const response = await clientService.getAllClients(page, pageSize, sortField, sortOrder);
-      
-      // Only proceed if this is still the active request
-      if (requestRef.current?.signal.aborted) {
-        console.log('Request was aborted, skipping update');
-        return;
-      }
-      
-      console.log('Client response received:', response);
-      setClients(response.content || []);
-      setError(null);
-      return response;
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('Request aborted');
-        return;
-      }
-      
+      setLoading(true);
+      setError(null); // Clear error before making the request
+      const response = await clientService.getAllClients({
+        page,
+        size: pageSize,
+        sort: sortField,
+        direction: sortOrder
+      });
+      setClients(response.content);
+    } catch (err) {
       console.error('Error loading clients:', err);
-      
-      if (err.response?.status === 401) {
-        console.log('Authentication failed, clearing data');
-        setIsAuthenticated(false);
-        clearAllData();
-        setError('Authentication failed. Please log in again.');
-      } else if (err.response?.status === 403) {
-        setError('You do not have permission to access client data.');
-      } else {
-        const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
-        setError(`Failed to load clients: ${errorMessage}`);
-      }
-      throw err;
+      setError('Failed to load initial clients');
     } finally {
-      if (requestRef.current?.signal.aborted === false) {
-        setLoading(false);
-        requestRef.current = null;
-      }
+      setLoading(false);
     }
-  }, [isAuthenticated, loading]);
+  }, [isAuthenticated]);
 
   const refreshInterfaces = async () => {
-    if (!isAuthenticated || !selectedClient) return;
-
-    setLoading(true);
+    if (!selectedClient) return;
     try {
-      const response = await interfaceService.getInterfacesByClientId(selectedClient.id);
-      setInterfaces(response || []);
-      setError(null);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        setIsAuthenticated(false);
-        clearAllData();
-        setError('Authentication failed. Please log in again.');
-      } else if (err.response?.status === 403) {
-        setError('You do not have permission to access interface data.');
-      } else {
-        const errorMessage = err.response?.data?.message || err.message || 'Failed to load interfaces';
-        setError(`Failed to load interfaces: ${errorMessage}`);
-      }
+      setLoading(true);
+      const response = await clientService.getClientInterfaces(selectedClient.id);
+      setInterfaces(response);
+    } catch (err) {
+      setError('Failed to load interfaces');
     } finally {
       setLoading(false);
     }
@@ -225,25 +177,26 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
     return userRoles.includes(role);
   };
 
+  const value: ClientInterfaceContextType = {
+    clients,
+    interfaces,
+    selectedClient,
+    selectedInterface,
+    loading,
+    error,
+    isAuthenticated,
+    userRoles,
+    refreshClients,
+    refreshInterfaces,
+    setSelectedClient,
+    setSelectedInterface,
+    hasRole,
+    setError,
+    setClients
+  };
+
   return (
-    <ClientInterfaceContext.Provider
-      value={{
-        clients,
-        interfaces,
-        selectedClient,
-        selectedInterface,
-        setSelectedClient: handleSetSelectedClient,
-        setSelectedInterface,
-        loading,
-        error,
-        setError,
-        refreshClients,
-        refreshInterfaces,
-        userRoles,
-        hasRole,
-        isAuthenticated
-      }}
-    >
+    <ClientInterfaceContext.Provider value={value}>
       {children}
     </ClientInterfaceContext.Provider>
   );

@@ -1,67 +1,107 @@
 import axios from 'axios';
-import { ErrorResponse } from '../types';
 
-export class ApiError extends Error {
-    status: number;
-    details?: string[];
+export interface ApiError {
+    message: string;
+    status?: number;
+    code?: string;
+    details?: any;
+}
 
-    constructor(message: string, status: number, details?: string[]) {
+export class ApiException extends Error implements ApiError {
+    constructor(
+        public message: string,
+        public status?: number,
+        public code?: string,
+        public details?: any
+    ) {
         super(message);
-        this.name = 'ApiError';
-        this.status = status;
-        this.details = details;
+        this.name = 'ApiException';
     }
 }
 
-const isAxiosError = (error: unknown): boolean => {
-    return (
-        typeof error === 'object' &&
-        error !== null &&
-        'isAxiosError' in error &&
-        (error as { isAxiosError: boolean }).isAxiosError === true
-    );
-};
+interface AxiosErrorResponse {
+    message: string;
+    code?: string;
+    details?: any;
+}
 
 export const handleApiError = (error: unknown): ApiError => {
-    if (error instanceof ApiError) {
+    if (error instanceof ApiException) {
         return error;
     }
 
+    // Type guard for Axios error
+    const isAxiosError = (error: unknown): error is any => {
+        return typeof error === 'object' && error !== null && 'isAxiosError' in error;
+    };
+
     if (isAxiosError(error)) {
-        const axiosError = error as any;
-        const response = axiosError.response?.data as ErrorResponse;
-        return new ApiError(
-            response?.message || axiosError.message || 'An unexpected error occurred',
-            axiosError.response?.status || 500,
-            response?.details
-        );
+        const { response, message } = error;
+        
+        if (response?.data) {
+            const { status, data } = response;
+            return {
+                message: data.message || message,
+                status,
+                code: data.code,
+                details: data.details
+            };
+        }
+        
+        return {
+            message: message || 'Network error occurred',
+            status: 500
+        };
     }
 
-    if (error instanceof Error) {
-        return new ApiError(error.message, 500);
+    // Type guard for Error object
+    const isError = (error: unknown): error is Error => {
+        return error instanceof Error;
+    };
+
+    if (isError(error)) {
+        const err = error as Error;
+        return {
+            message: err.message,
+            status: 500
+        };
     }
 
-    return new ApiError('An unexpected error occurred', 500);
-};
-
-export const isAuthenticationError = (error: unknown): boolean => {
-    if (error instanceof ApiError) {
-        return error.status === 401 || error.status === 403;
-    }
-    if (isAxiosError(error)) {
-        const axiosError = error as any;
-        return axiosError.response?.status === 401 || axiosError.response?.status === 403;
-    }
-    return false;
+    return {
+        message: 'An unexpected error occurred',
+        status: 500
+    };
 };
 
 export const isApiError = (error: unknown): error is ApiError => {
-    return (
-        typeof error === 'object' &&
-        error !== null &&
-        'message' in error &&
-        typeof (error as ApiError).message === 'string'
-    );
+    return error instanceof ApiException || 
+           (typeof error === 'object' && error !== null && 'message' in error);
+};
+
+export const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    if (typeof error === 'string') {
+        return error;
+    }
+    return 'An unexpected error occurred';
+};
+
+export const isAuthenticationError = (error: unknown): boolean => {
+    if (error instanceof ApiException) {
+        return error.status === 401 || error.status === 403;
+    }
+
+    // Type guard for Axios error
+    const isAxiosError = (error: unknown): error is any => {
+        return typeof error === 'object' && error !== null && 'isAxiosError' in error;
+    };
+
+    if (isAxiosError(error)) {
+        return error.response?.status === 401 || error.response?.status === 403;
+    }
+    return false;
 };
 
 export const handleApiErrorOld = (error: unknown, setError: (message: string) => void) => {
@@ -116,4 +156,26 @@ export const getValidationErrors = (error: unknown): string[] => {
         return response?.validationErrors || [];
     }
     return [];
+};
+
+export const handleValidationErrors = (error: any, setFormErrors: (errors: any) => void) => {
+  if (error.response?.status === 400 && error.response?.data?.message) {
+    const errorMessage = error.response.data.message;
+    const errors: Record<string, string> = {};
+    
+    // Parse the error message to identify error fields
+    if (errorMessage.includes('name')) {
+      errors.name = 'Name error: ' + errorMessage;
+    }
+    if (errorMessage.includes('code')) {
+      errors.code = 'Code error: ' + errorMessage;
+    }
+    if (errorMessage.includes('status')) {
+      errors.status = 'Status error: ' + errorMessage;
+    }
+    
+    setFormErrors(errors);
+    return true;
+  }
+  return false;
 }; 

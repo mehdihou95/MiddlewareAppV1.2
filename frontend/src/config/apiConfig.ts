@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { tokenManager } from '../utils/tokenManager';
 
 export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
@@ -10,73 +10,161 @@ interface AuthResponse {
     user: any;
 }
 
+interface CsrfResponse {
+    csrfToken: string;
+}
+
+interface ExtendedRequestConfig extends AxiosRequestConfig {
+    _csrfRetry?: boolean;
+    _jwtRetry?: boolean;
+}
+
 // Create a single axios instance for the entire application
 const api = axios.create({
-    baseURL: API_URL,
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json'
     },
     withCredentials: true // Enable credentials for CSRF
 });
 
+// Function to get CSRF token from cookies
+const getCsrfToken = () => {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'XSRF-TOKEN') {
+            return value;
+        }
+    }
+    return null;
+};
+
+// Function to handle token validation
+const validateToken = async () => {
+    try {
+        await api.get('/api/auth/validate');
+        return true;
+    } catch (error) {
+        console.error('Token validation failed:', error);
+        return false;
+    }
+};
+
 // Add request interceptor for both auth token and CSRF
 api.interceptors.request.use(
     (config) => {
-        // Add auth token if available
-        const token = tokenManager.getToken();
-        if (token && config.headers) {
-            config.headers['Authorization'] = `Bearer ${token}`;
+        if (!config.headers) {
+            config.headers = {};
         }
 
-        // Add CSRF token if available
-        const csrfToken = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('XSRF-TOKEN='))
-            ?.split('=')[1];
-        
-        if (csrfToken && config.headers) {
-            config.headers['X-XSRF-TOKEN'] = csrfToken;
+        // Skip token check for auth endpoints
+        if (config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh')) {
+            return config;
+        }
+
+        // Add auth token if available
+        const token = tokenManager.getToken();
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        } else if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+        }
+
+        // Add CSRF token for non-GET requests
+        if (config.method?.toUpperCase() !== 'GET') {
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                config.headers['X-XSRF-TOKEN'] = csrfToken;
+            }
         }
 
         return config;
     },
     (error) => {
+        console.error('Request interceptor error:', error);
         return Promise.reject(error);
     }
 );
 
-// Response interceptor with token refresh logic
+// Function to refresh CSRF token
+const refreshCsrfToken = async (): Promise<string | null> => {
+    try {
+        const response = await api.post<CsrfResponse>('/auth/refresh-csrf', {}, {
+            headers: {
+                'Authorization': `Bearer ${tokenManager.getToken()}`
+            }
+        });
+        return response.data.csrfToken;
+    } catch (error) {
+        console.error('Failed to refresh CSRF token:', error);
+        return null;
+    }
+};
+
+// Response interceptor with token refresh logic and better error handling
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
-        const originalRequest = error.config;
-        
-        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-            originalRequest._retry = true;
-            const refreshToken = tokenManager.getRefreshToken();
-            
-            if (refreshToken) {
-                try {
-                    const response = await api.post<AuthResponse>('/auth/refresh', { refreshToken });
-                    const { token, refreshToken: newRefreshToken } = response.data;
-                    
-                    tokenManager.setToken(token, newRefreshToken);
-                    if (originalRequest.headers) {
-                        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+        const originalRequest = error.config as ExtendedRequestConfig;
+        if (!originalRequest) {
+            return Promise.reject(error);
+        }
+
+        // Handle CSRF token expiration (403 Forbidden)
+        if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+            originalRequest._csrfRetry = true;
+            try {
+                const response = await api.post<CsrfResponse>('/api/auth/refresh-csrf');
+                if (response.data.csrfToken) {
+                    if (!originalRequest.headers) {
+                        originalRequest.headers = {};
                     }
-                    
+                    originalRequest.headers['X-XSRF-TOKEN'] = response.data.csrfToken;
                     return api(originalRequest);
-                } catch (refreshError) {
-                    tokenManager.clearToken();
-                    // Only redirect to login if we're not already there
-                    if (!window.location.pathname.includes('/login')) {
-                        window.location.href = '/login';
-                    }
-                    throw refreshError;
+                }
+            } catch (csrfError) {
+                console.error('CSRF refresh failed:', csrfError);
+            }
+        }
+
+        // Handle JWT token expiration (401 Unauthorized)
+        if (error.response?.status === 401 && !originalRequest._jwtRetry) {
+            originalRequest._jwtRetry = true;
+            try {
+                const refreshToken = tokenManager.getRefreshToken();
+                if (!refreshToken) {
+                    throw new Error('No refresh token available');
+                }
+
+                const response = await api.post<AuthResponse>('/api/auth/refresh', { refreshToken });
+                const { token, refreshToken: newRefreshToken } = response.data;
+
+                tokenManager.setToken(token);
+                tokenManager.setRefreshToken(newRefreshToken);
+                if (!originalRequest.headers) {
+                    originalRequest.headers = {};
+                }
+                originalRequest.headers['Authorization'] = `Bearer ${token}`;
+
+                // Validate the new token
+                const isValid = await validateToken();
+                if (!isValid) {
+                    tokenManager.clearTokens();
+                    window.location.href = '/login';
+                    return Promise.reject('Invalid token after refresh');
+                }
+
+                return api(originalRequest);
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError);
+                tokenManager.clearTokens();
+                if (!window.location.pathname.includes('/login')) {
+                    window.location.href = '/login';
                 }
             }
         }
-        
+
         return Promise.reject(error);
     }
 );
@@ -84,7 +172,7 @@ api.interceptors.response.use(
 // Export the configured axios instance
 export default api;
 
-// Export a function to reset axios defaults (useful for logout)
+// Export a function to reset axios defaults
 export const resetAxiosDefaults = () => {
     delete api.defaults.headers.common['Authorization'];
 }; 

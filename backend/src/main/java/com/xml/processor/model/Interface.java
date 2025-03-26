@@ -1,26 +1,37 @@
 package com.xml.processor.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 
+/**
+ * Entity representing an interface in the system.
+ * Each interface belongs to a client and has specific configuration settings.
+ */
 @Entity
 @Table(name = "interfaces")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Interface {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "Name is required")
-    @Size(max = 100)
-    @Column(nullable = false, length = 100)
+    @Size(min = 3, max = 50, message = "Name must be between 3 and 50 characters")
+    @Column(nullable = false, length = 50)
     private String name;
 
     @NotBlank(message = "Type is required")
-    @Size(max = 50)
-    @Column(nullable = false, length = 50)
+    @Size(max = 20, message = "Type must not exceed 20 characters")
+    @Column(nullable = false, length = 20)
     private String type;
 
     @Size(max = 500)
@@ -40,9 +51,10 @@ public class Interface {
     @Column(length = 255)
     private String namespace;
 
-    @NotNull(message = "Client is required")
+    @JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_id", nullable = false)
+    @JoinColumn(name = "client_id")
+    @NotNull(message = "Client is required")
     private Client client;
 
     @Column(nullable = false)
@@ -51,10 +63,10 @@ public class Interface {
     @Column(nullable = false)
     private int priority = 0;
 
-    @Column(nullable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist

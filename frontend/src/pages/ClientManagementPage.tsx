@@ -35,6 +35,8 @@ import { Client, ClientInput } from '../types';
 import { useClientInterface } from '../context/ClientInterfaceContext';
 import { ClientDialog, ConfirmDialog } from '../components';
 import { debounce } from 'lodash';
+import { handleValidationErrors, handleApiError } from '../utils/errorHandler';
+import { PaginationParams, getDefaultPaginationParams } from '../utils/paginationUtils';
 
 type Order = 'asc' | 'desc';
 
@@ -46,7 +48,8 @@ export const ClientManagementPage: React.FC = () => {
     refreshClients, 
     hasRole, 
     setError,
-    isAuthenticated 
+    isAuthenticated,
+    setClients
   } = useClientInterface();
   const [openDialog, setOpenDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -70,6 +73,7 @@ export const ClientManagementPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [orderBy, setOrderBy] = useState<keyof Client>('name');
   const [order, setOrder] = useState<Order>('asc');
+  const [filter, setFilter] = useState('');
 
   // Memoize and debounce the loadClients function
   const debouncedLoadClients = React.useMemo(
@@ -78,16 +82,23 @@ export const ClientManagementPage: React.FC = () => {
         if (!isAuthenticated) return;
         
         try {
-          const response = await refreshClients(page, rowsPerPage, orderBy, order);
-          if (response) {
-            setTotalCount(response.totalElements || 0);
-          }
+          const params: PaginationParams = {
+            page,
+            size: rowsPerPage,
+            sort: orderBy,
+            direction: order,
+            filter
+          };
+          const response = await clientService.getAllClients(params);
+          setTotalCount(response.totalElements || 0);
+          setClients(response.content);
+          setError(null); // Clear any existing error message after successful load
         } catch (err: any) {
           const errorMessage = err.response?.data?.message || err.message || 'Failed to load clients';
           setError(errorMessage);
         }
       }, 300),
-    [page, rowsPerPage, orderBy, order, refreshClients, setError, isAuthenticated]
+    [page, rowsPerPage, orderBy, order, filter, setError, isAuthenticated]
   );
 
   // Use the debounced function in useEffect
@@ -173,22 +184,63 @@ export const ClientManagementPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    console.log('ClientManagementPage: handleSubmit called');
+    console.log('ClientManagementPage: Current form data:', formData);
+    
+    if (!validateForm()) {
+      console.log('ClientManagementPage: Form validation failed', formErrors);
+      return;
+    }
 
     try {
       const clientData = {
         ...formData,
         code: formData.code.trim().toUpperCase(),
+        createdAt: formData.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
+      console.log('ClientManagementPage: Sending client data to backend:', clientData);
 
+      let savedClient;
       if (editingClient) {
-        await clientService.updateClient(editingClient.id, clientData);
+        console.log('ClientManagementPage: Updating existing client');
+        savedClient = await clientService.updateClient(editingClient.id, clientData);
       } else {
-        await clientService.createClient(clientData);
+        console.log('ClientManagementPage: Creating new client');
+        savedClient = await clientService.createClient(clientData as Omit<Client, 'id'>);
+        console.log('ClientManagementPage: Server response:', savedClient);
       }
+
+      console.log('ClientManagementPage: Client saved successfully');
       handleCloseDialog();
-      await refreshClients();
+      
+      // Force immediate refresh of clients list
+      console.log('ClientManagementPage: Forcing immediate refresh of clients list');
+      try {
+        const params: PaginationParams = {
+          page,
+          size: rowsPerPage,
+          sort: orderBy,
+          direction: order,
+          filter
+        };
+        const response = await clientService.getAllClients(params);
+        setTotalCount(response.totalElements || 0);
+        setClients(response.content);
+        setError(null);
+        console.log('ClientManagementPage: Clients list refreshed successfully');
+      } catch (refreshError: any) {
+        console.error('ClientManagementPage: Error refreshing clients:', refreshError);
+        const errorMessage = refreshError.response?.data?.message || refreshError.message || 'Failed to refresh clients';
+        setError(errorMessage);
+      }
     } catch (err: any) {
+      console.error('ClientManagementPage: Error saving client:', err);
+      console.error('ClientManagementPage: Error details:', {
+        response: err.response?.data,
+        status: err.response?.status,
+        headers: err.response?.headers
+      });
       const errorMessage = err.response?.data?.message || err.message || 'Failed to save client';
       setError(errorMessage);
       if (err.response?.status === 400 && err.response?.data?.message?.includes('code')) {
@@ -264,6 +316,14 @@ export const ClientManagementPage: React.FC = () => {
           )}
         </Alert>
       )}
+
+      <TextField
+        fullWidth
+        label="Filter"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        sx={{ mb: 2 }}
+      />
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>

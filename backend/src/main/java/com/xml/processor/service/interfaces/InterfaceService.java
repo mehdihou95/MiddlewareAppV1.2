@@ -194,4 +194,13 @@ public interface InterfaceService {
      * @throws ValidationException if the XML content is invalid
      */
     Interface detectInterface(String xmlContent, Long clientId);
+
+    /**
+     * Checks if an interface exists by name and client ID.
+     *
+     * @param name The name to check
+     * @param clientId The ID of the client
+     * @return true if the interface exists, false otherwise
+     */
+    boolean existsByNameAndClientId(String name, Long clientId);
 } 

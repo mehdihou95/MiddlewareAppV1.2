@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import io.jsonwebtoken.JwtException;
 
 import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
@@ -36,12 +38,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(ValidationException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Validation Error",
-            ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        ErrorResponse errorResponse = new ErrorResponse("VALIDATION_ERROR", ex.getMessage());
+        return ResponseEntity.badRequest().body(errorResponse);
     }
 
     /**
@@ -50,14 +48,10 @@ public class GlobalExceptionHandler {
      * @param ex The ResourceNotFoundException
      * @return ResponseEntity containing the error details
      */
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.NOT_FOUND.value(),
-            "Resource Not Found",
-            ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(NoHandlerFoundException ex) {
+        ErrorResponse errorResponse = new ErrorResponse("RESOURCE_NOT_FOUND", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     /**
@@ -67,13 +61,10 @@ public class GlobalExceptionHandler {
      * @return ResponseEntity containing the error details
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "Internal Server Error",
-            ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
+        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_SERVER_ERROR", 
+            "An unexpected error occurred. Please try again later.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
     @ExceptionHandler(XmlValidationException.class)
@@ -191,6 +182,19 @@ public class GlobalExceptionHandler {
             "Unauthorized access",
             ex.getMessage(),
             LocalDateTime.now()
+        );
+        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<ErrorResponse> handleJwtException(JwtException ex) {
+        log.error("JWT error: {}", ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+            HttpStatus.UNAUTHORIZED.value(),
+            "AUTH_002",
+            "Invalid or expired token",
+            LocalDateTime.now(),
+            List.of(ex.getMessage())
         );
         return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
     }

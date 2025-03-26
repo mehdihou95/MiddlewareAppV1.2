@@ -7,6 +7,7 @@ import com.xml.processor.model.Interface;
 import com.xml.processor.model.Client;
 import com.xml.processor.repository.InterfaceRepository;
 import com.xml.processor.service.interfaces.InterfaceService;
+import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -20,16 +21,24 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
- * Implementation of the InterfaceService interface.
- * Provides CRUD operations, search functionality, and client-specific operations for Interface entities.
+ * Primary implementation of the InterfaceService interface.
+ * This service handles all interface-related operations including CRUD operations,
+ * validation, and business logic for interface management.
  */
 @Service
 public class InterfaceServiceImpl implements InterfaceService {
     
+    private final InterfaceRepository interfaceRepository;
+    private final Validator validator;
+    
     @Autowired
-    private InterfaceRepository interfaceRepository;
+    public InterfaceServiceImpl(InterfaceRepository interfaceRepository, Validator validator) {
+        this.interfaceRepository = interfaceRepository;
+        this.validator = validator;
+    }
     
     @Override
     public List<Interface> getAllInterfaces() {
@@ -37,7 +46,7 @@ public class InterfaceServiceImpl implements InterfaceService {
     }
     
     @Override
-    @Cacheable(value = "interfaces", key = "#id")
+    @Transactional(readOnly = true)
     public Optional<Interface> getInterfaceById(Long id) {
         return interfaceRepository.findById(id);
     }
@@ -78,6 +87,7 @@ public class InterfaceServiceImpl implements InterfaceService {
     }
     
     @Override
+    @Transactional(readOnly = true)
     public List<Interface> getClientInterfaces(Long clientId) {
         return interfaceRepository.findByClient_Id(clientId);
     }
@@ -94,7 +104,7 @@ public class InterfaceServiceImpl implements InterfaceService {
     }
     
     @Override
-    @Cacheable(value = "interfaces", key = "'client_' + #clientId")
+    @Transactional(readOnly = true)
     public Page<Interface> getInterfacesByClient(Long clientId, Pageable pageable) {
         return interfaceRepository.findByClient_Id(clientId, pageable);
     }
@@ -179,5 +189,11 @@ public class InterfaceServiceImpl implements InterfaceService {
             throw new ValidationException("Interface with name " + interfaceEntity.getName() + 
                 " already exists for this client");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByNameAndClientId(String name, Long clientId) {
+        return interfaceRepository.existsByNameAndClient_Id(name, clientId);
     }
 } 
