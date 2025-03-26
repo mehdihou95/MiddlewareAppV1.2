@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { tokenManager } from '../utils/tokenManager';
+import { tokenService } from '../services/tokenService';
 
 interface ErrorResponse {
     type: string;
@@ -29,14 +29,14 @@ export const handleError = (error: unknown): ErrorResponse => {
             };
         } else if (response?.code === 'AUTH_002') {
             // Handle invalid token errors
-            tokenManager.clearTokens();
+            tokenService.clearTokens();
             return {
                 type: 'INVALID_TOKEN',
                 message: 'Your session has expired. Please log in again.'
             };
         } else if (error.response?.status === 401) {
             // Handle other unauthorized errors
-            tokenManager.clearTokens();
+            tokenService.clearTokens();
             return {
                 type: 'UNAUTHORIZED',
                 message: 'You are not authorized to perform this action'

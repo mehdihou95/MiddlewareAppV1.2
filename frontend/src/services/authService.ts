@@ -1,29 +1,33 @@
-import api, { resetAxiosDefaults } from '../config/apiConfig';
+import { api, apiService } from './apiService';
+import { tokenService, TokenResponse } from './tokenService';
 import { handleApiError } from '../utils/errorHandler';
-import { tokenManager } from '../utils/tokenManager';
-import { User } from '../types';
 
-interface LoginCredentials {
+export interface LoginCredentials {
     username: string;
     password: string;
 }
 
-interface LoginResponse {
-    token: string;
-    refreshToken: string;
+export interface LoginResponse extends TokenResponse {
     username: string;
     roles: string[];
     csrfToken?: string;
 }
 
-interface RefreshTokenResponse {
+export interface RefreshTokenResponse {
     token: string;
     refreshToken: string;
 }
 
-interface ValidateTokenResponse {
+export interface ValidateTokenResponse {
     valid: boolean;
     username: string;
+    roles: string[];
+}
+
+export interface User {
+    id: number;
+    username: string;
+    email: string;
     roles: string[];
 }
 
@@ -31,48 +35,48 @@ export const authService = {
     login: async (username: string, password: string): Promise<LoginResponse> => {
         console.log('Attempting login for user:', username);
         try {
-            const response = await api.post<LoginResponse>('/auth/login', { username, password });
+            const response = await api.post<LoginResponse>('/auth/login', { 
+                username: username.trim(), 
+                password: password.trim() 
+            });
             console.log('Login successful, storing tokens');
             
-            // Store JWT tokens
-            tokenManager.setToken(response.data.token, response.data.refreshToken);
+            // Store tokens
+            tokenService.setTokens(response.data.token, response.data.refreshToken);
             
-            // Store CSRF token in cookie if it's not already set by the server
+            // Store CSRF token if provided
             if (response.data.csrfToken) {
-                const cookies = document.cookie.split(';');
-                const hasCsrfCookie = cookies.some(cookie => cookie.trim().startsWith('XSRF-TOKEN='));
-                if (!hasCsrfCookie) {
-                    document.cookie = `XSRF-TOKEN=${response.data.csrfToken}; path=/`;
-                }
+                tokenService.setCsrfToken(response.data.csrfToken);
             }
             
             return response.data;
         } catch (error) {
             console.error('Login failed:', error);
-            throw error;
+            throw apiService.handleError(error);
         }
     },
 
     logout: async (): Promise<void> => {
         console.log('Logging out user');
         try {
+            // Call logout endpoint
             await api.post('/auth/logout');
-            console.log('Logout successful, clearing tokens');
-            tokenManager.clearTokens();
         } catch (error) {
-            console.error('Logout failed:', error);
-            // Clear tokens anyway
-            tokenManager.clearTokens();
-            throw error;
+            console.error('Logout API call failed:', error);
+            // Continue with logout process regardless of API call result
+        } finally {
+            // Clear tokens and redirect
+            tokenService.clearTokens();
+            window.location.href = '/login';
         }
     },
 
     isAuthenticated: (): boolean => {
-        return tokenManager.isTokenValid();
+        return tokenService.isTokenValid();
     },
 
     refreshToken: async (): Promise<string> => {
-        const refreshToken = tokenManager.getRefreshToken();
+        const refreshToken = tokenService.getRefreshToken();
         console.log('Attempting to refresh token');
         
         if (!refreshToken) {
@@ -85,18 +89,17 @@ export const authService = {
                 refreshToken: refreshToken
             });
             console.log('Token refresh successful');
-            tokenManager.setToken(response.data.token, response.data.refreshToken);
+            tokenService.setTokens(response.data.token, response.data.refreshToken);
             return response.data.token;
         } catch (error) {
             console.error('Token refresh failed:', error);
-            tokenManager.clearTokens();
+            tokenService.clearTokens();
             throw error;
         }
     },
 
     validateToken: async (): Promise<ValidateTokenResponse> => {
         try {
-            // The token is automatically added to the header by the interceptor
             const response = await api.get<ValidateTokenResponse>('/auth/validate');
             return response.data;
         } catch (error) {
@@ -111,12 +114,15 @@ export const authService = {
 
     getCurrentUser: async (): Promise<User> => {
         try {
-            // Since there's no /auth/me endpoint, we'll use /user endpoint from UserController
-            const response = await api.get<User>('/user');
-            return response.data;
+            return await apiService.get<User>('/user');
         } catch (error) {
-            throw handleApiError(error);
+            throw apiService.handleError(error);
         }
+    },
+
+    hasRole: (role: string): boolean => {
+        const userInfo = tokenService.getUserInfo();
+        return userInfo?.roles.includes(role) || false;
     }
 };
 

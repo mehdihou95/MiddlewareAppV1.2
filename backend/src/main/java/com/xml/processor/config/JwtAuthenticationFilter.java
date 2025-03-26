@@ -1,6 +1,6 @@
 package com.xml.processor.config;
 
-import com.xml.processor.service.impl.JwtBlacklistService;
+import com.xml.processor.security.service.JwtBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,32 +34,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
-        log.info("Processing request to: {}", path);
+        log.debug("Processing request to: {}", path);
         
-        final String authHeader = request.getHeader("Authorization");
-        log.info("Auth header: {}", authHeader != null ? "Present" : "Missing");
+        // Skip authentication for public endpoints
+        if (shouldSkipAuthentication(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.info("No valid auth header found for path: {}", path);
+        final String token = jwtService.extractTokenFromRequest(request);
+        if (token == null) {
+            log.debug("No JWT token found for path: {}", path);
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
-            final String jwt = authHeader.substring(7);
-            final String userEmail = jwtService.extractUsername(jwt);
+            final String userEmail = jwtService.extractUsername(token);
             
-            log.info("JWT token extracted for user: {}", userEmail);
+            log.debug("JWT token extracted for user: {}", userEmail);
             
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
                 
-                if (jwtService.isTokenValid(jwt, userDetails) && !jwtBlacklistService.isBlacklisted(jwt)) {
-                    log.info("Valid token for user: {}", userEmail);
+                if (jwtService.isTokenValid(token, userDetails) && !jwtBlacklistService.isBlacklisted(token)) {
+                    log.debug("Valid token for user: {}", userEmail);
                     
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
-                            null,
+                            token, // Store token as credentials for potential access in services
                             userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -73,5 +76,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+    
+    private boolean shouldSkipAuthentication(String path) {
+        return path.startsWith("/api/auth/login") ||
+               path.startsWith("/api/auth/refresh") ||
+               path.startsWith("/api/auth/validate") ||
+               path.startsWith("/h2-console") ||
+               path.equals("/error") ||
+               path.equals("/favicon.ico");
     }
 } 

@@ -17,6 +17,7 @@ import { ClientInterfaceProvider } from './context/ClientInterfaceContext';
 import AuditLogs from './components/AuditLogs';
 import UserManagement from './components/UserManagement';
 import { useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Root component to handle authentication check and default routing
 const Root: React.FC = () => {
@@ -119,7 +120,7 @@ const AppContent: React.FC = () => {
 // Main App component
 const App: React.FC = () => {
   return (
-    <Router>
+    <ErrorBoundary>
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <CssBaseline />
@@ -128,7 +129,7 @@ const App: React.FC = () => {
           </ClientInterfaceProvider>
         </ThemeProvider>
       </AuthProvider>
-    </Router>
+    </ErrorBoundary>
   );
 };
 

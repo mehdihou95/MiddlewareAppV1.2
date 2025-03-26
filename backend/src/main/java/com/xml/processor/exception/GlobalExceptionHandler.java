@@ -1,7 +1,8 @@
 package com.xml.processor.exception;
 
-import com.xml.processor.model.ErrorResponse;
+import com.xml.processor.model.StandardErrorResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -11,13 +12,14 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import io.jsonwebtoken.JwtException;
 
 import jakarta.validation.ConstraintViolationException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,172 +32,192 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Handles ValidationException and returns a 400 Bad Request response.
-     *
-     * @param ex The ValidationException
-     * @return ResponseEntity containing the error details
-     */
+    @ExceptionHandler(ApplicationException.class)
+    public ResponseEntity<StandardErrorResponse> handleApplicationException(ApplicationException ex) {
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ex.getErrorCode())
+            .message(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        HttpStatus status = determineHttpStatus(ex.getErrorCode());
+        return ResponseEntity.status(status).body(response);
+    }
+    
     @ExceptionHandler(ValidationException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(ValidationException ex) {
-        ErrorResponse errorResponse = new ErrorResponse("VALIDATION_ERROR", ex.getMessage());
-        return ResponseEntity.badRequest().body(errorResponse);
-    }
-
-    /**
-     * Handles ResourceNotFoundException and returns a 404 Not Found response.
-     *
-     * @param ex The ResourceNotFoundException
-     * @return ResponseEntity containing the error details
-     */
-    @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(NoHandlerFoundException ex) {
-        ErrorResponse errorResponse = new ErrorResponse("RESOURCE_NOT_FOUND", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
-    }
-
-    /**
-     * Handles general exceptions and returns a 500 Internal Server Error response.
-     *
-     * @param ex The Exception
-     * @return ResponseEntity containing the error details
-     */
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
-        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_SERVER_ERROR", 
-            "An unexpected error occurred. Please try again later.");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-    }
-
-    @ExceptionHandler(XmlValidationException.class)
-    public ResponseEntity<ErrorResponse> handleXmlValidationException(XmlValidationException ex) {
-        log.error("XML validation error: {}", ex.getMessage());
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "XML validation failed",
-            "The provided XML document is invalid",
-            LocalDateTime.now(),
-            ex.getValidationErrors()
+    public ResponseEntity<StandardErrorResponse> handleValidationException(ValidationException ex) {
+        StandardErrorResponse response = StandardErrorResponse.validationError(
+            "Validation failed", 
+            ex.getFieldErrors()
         );
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest().body(response);
     }
-
+    
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
-        List<String> errors = ex.getBindingResult()
+    public ResponseEntity<StandardErrorResponse> handleMethodArgumentNotValidException(
+            MethodArgumentNotValidException ex) {
+        
+        Map<String, String> fieldErrors = ex.getBindingResult()
             .getFieldErrors()
             .stream()
-            .map(error -> error.getField() + ": " + error.getDefaultMessage())
-            .collect(Collectors.toList());
-
-        log.error("Method argument validation error: {}", errors);
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Validation failed",
-            "Invalid input data",
-            LocalDateTime.now(),
-            errors
-        );
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            .collect(Collectors.toMap(
+                FieldError::getField,
+                fieldError -> fieldError.getDefaultMessage() == null ? "Invalid value" : fieldError.getDefaultMessage(),
+                (existing, replacement) -> existing + "; " + replacement
+            ));
+        
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.VAL_INVALID_FORMAT)
+            .message("Validation failed")
+            .fieldErrors(fieldErrors)
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.badRequest().body(response);
     }
-
+    
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolationException(ConstraintViolationException ex) {
-        List<String> errors = ex.getConstraintViolations()
+    public ResponseEntity<StandardErrorResponse> handleConstraintViolationException(
+            ConstraintViolationException ex) {
+        
+        Map<String, String> fieldErrors = ex.getConstraintViolations()
             .stream()
-            .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
-            .collect(Collectors.toList());
-
-        log.error("Constraint violation: {}", errors);
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Validation failed",
-            "Invalid input data",
-            LocalDateTime.now(),
-            errors
-        );
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            .collect(Collectors.toMap(
+                violation -> violation.getPropertyPath().toString(),
+                violation -> violation.getMessage(),
+                (existing, replacement) -> existing + "; " + replacement
+            ));
+        
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.VAL_INVALID_FORMAT)
+            .message("Validation failed")
+            .fieldErrors(fieldErrors)
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.badRequest().body(response);
     }
-
+    
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+    public ResponseEntity<StandardErrorResponse> handleAuthenticationException(
             AuthenticationException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "Authentication failed",
-            ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.AUTH_INVALID_CREDENTIALS)
+            .message("Authentication failed")
+            .detail(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
-
+    
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+    public ResponseEntity<StandardErrorResponse> handleAccessDeniedException(
             AccessDeniedException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.FORBIDDEN.value(),
-            "Access denied",
-            ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.AUTH_INSUFFICIENT_PRIVILEGES)
+            .message("Access denied")
+            .detail(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
-
+    
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentialsException(
+    public ResponseEntity<StandardErrorResponse> handleBadCredentialsException(
             BadCredentialsException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "Invalid credentials",
-            "Username or password is incorrect"
-        );
-        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.AUTH_INVALID_CREDENTIALS)
+            .message("Invalid credentials")
+            .detail("Username or password is incorrect")
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("Illegal argument error: {}", ex.getMessage());
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Illegal argument",
-            ex.getMessage(),
-            LocalDateTime.now()
-        );
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
-        log.error("File size exceeds maximum allowed size");
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "File size exceeds maximum allowed size",
-            "The uploaded file exceeds the maximum allowed size",
-            LocalDateTime.now()
-        );
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ErrorResponse> handleUnauthorizedException(UnauthorizedException ex) {
-        log.error("Unauthorized access: {}", ex.getMessage());
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "Unauthorized access",
-            ex.getMessage(),
-            LocalDateTime.now()
-        );
-        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-    }
-
+    
     @ExceptionHandler(JwtException.class)
-    public ResponseEntity<ErrorResponse> handleJwtException(JwtException ex) {
-        log.error("JWT error: {}", ex.getMessage());
-        ErrorResponse response = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "AUTH_002",
-            "Invalid or expired token",
-            LocalDateTime.now(),
-            List.of(ex.getMessage())
-        );
-        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    public ResponseEntity<StandardErrorResponse> handleJwtException(JwtException ex) {
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.AUTH_INVALID_TOKEN)
+            .message("Invalid or expired token")
+            .detail(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+    
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<StandardErrorResponse> handleDataIntegrityViolationException(
+            DataIntegrityViolationException ex) {
+        
+        String message = "Database constraint violation";
+        Throwable cause = ex.getRootCause();
+        
+        // Extract specific database error information
+        if (cause instanceof SQLIntegrityConstraintViolationException) {
+            SQLIntegrityConstraintViolationException sqlEx = (SQLIntegrityConstraintViolationException) cause;
+            if (sqlEx.getErrorCode() == 1062) { // MySQL duplicate entry
+                message = "A record with this information already exists";
+            } else if (sqlEx.getErrorCode() == 1452) { // MySQL foreign key constraint
+                message = "Referenced record does not exist";
+            }
+        }
+        
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.BUS_DUPLICATE_RESOURCE)
+            .message(message)
+            .detail(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+    
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<StandardErrorResponse> handleNoHandlerFoundException(
+            NoHandlerFoundException ex) {
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.BUS_RESOURCE_NOT_FOUND)
+            .message("Resource not found")
+            .detail(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+    
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<StandardErrorResponse> handleGenericException(Exception ex) {
+        log.error("Unhandled exception", ex);
+        
+        StandardErrorResponse response = StandardErrorResponse.builder()
+            .code(ErrorCodes.SYS_UNEXPECTED_ERROR)
+            .message("An unexpected error occurred")
+            .detail("Please try again later or contact support if the problem persists")
+            .timestamp(LocalDateTime.now())
+            .build();
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+    
+    private HttpStatus determineHttpStatus(String errorCode) {
+        if (errorCode.startsWith("AUTH_")) {
+            return HttpStatus.UNAUTHORIZED;
+        } else if (errorCode.startsWith("VAL_")) {
+            return HttpStatus.BAD_REQUEST;
+        } else if (errorCode.startsWith("BUS_")) {
+            if (errorCode.equals(ErrorCodes.BUS_RESOURCE_NOT_FOUND)) {
+                return HttpStatus.NOT_FOUND;
+            } else if (errorCode.equals(ErrorCodes.BUS_DUPLICATE_RESOURCE)) {
+                return HttpStatus.CONFLICT;
+            }
+            return HttpStatus.BAD_REQUEST;
+        } else if (errorCode.startsWith("SYS_")) {
+            return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 } 

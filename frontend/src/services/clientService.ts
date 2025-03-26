@@ -1,4 +1,4 @@
-import api from '../config/apiConfig';
+import { api } from '../services/apiService';
 import { handleApiError } from '../utils/errorHandler';
 import { createPaginationParams, PaginationParams } from '../utils/paginationUtils';
 import { Client, ClientInput, Interface, PageResponse } from '../types';

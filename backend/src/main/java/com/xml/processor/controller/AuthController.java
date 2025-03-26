@@ -5,6 +5,7 @@ import com.xml.processor.model.RefreshTokenRequest;
 import com.xml.processor.service.impl.JwtBlacklistService;
 import com.xml.processor.service.impl.SecurityLogger;
 import com.xml.processor.security.RateLimiter;
+import com.xml.processor.security.service.CsrfTokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Cookie;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +33,8 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Slf4j
 public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     
@@ -39,21 +44,7 @@ public class AuthController {
     private final JwtBlacklistService jwtBlacklistService;
     private final SecurityLogger securityLogger;
     private final RateLimiter rateLimiter;
-
-    public AuthController(
-            AuthenticationManager authenticationManager,
-            JwtService jwtService,
-            UserDetailsService userDetailsService,
-            JwtBlacklistService jwtBlacklistService,
-            SecurityLogger securityLogger,
-            RateLimiter rateLimiter) {
-        this.authenticationManager = authenticationManager;
-        this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
-        this.jwtBlacklistService = jwtBlacklistService;
-        this.securityLogger = securityLogger;
-        this.rateLimiter = rateLimiter;
-    }
+    private final CsrfTokenService csrfTokenService;
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request, 
@@ -81,16 +72,9 @@ public class AuthController {
             String refreshToken = jwtService.generateRefreshToken(userDetails);
 
             // Generate new CSRF token
-            CsrfToken csrf = (CsrfToken) servletRequest.getAttribute(CsrfToken.class.getName());
-            if (csrf != null) {
-                Cookie cookie = new Cookie("XSRF-TOKEN", csrf.getToken());
-                cookie.setPath("/");
-                cookie.setSecure(servletRequest.isSecure());
-                cookie.setHttpOnly(false);
-                cookie.setMaxAge(3600); // 1 hour
-                response.addCookie(cookie);
-                response.setHeader(csrf.getHeaderName(), csrf.getToken());
-            }
+            CsrfToken csrfToken = csrfTokenService.generateToken(servletRequest, response);
+            
+            response.setHeader(csrfToken.getHeaderName(), csrfToken.getToken());
             
             securityLogger.logSuccessfulLogin(userDetails.getUsername(), ipAddress);
             rateLimiter.resetLimit(rateLimitKey);
@@ -102,8 +86,8 @@ public class AuthController {
             responseBody.put("roles", userDetails.getAuthorities().stream()
                 .map(auth -> auth.getAuthority().replace("ROLE_", ""))
                 .collect(Collectors.toList()));
-            if (csrf != null) {
-                responseBody.put("csrfToken", csrf.getToken());
+            if (csrfToken != null) {
+                responseBody.put("csrfToken", csrfToken.getToken());
             }
             
             return ResponseEntity.ok(responseBody);
@@ -186,44 +170,26 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(
-            @RequestHeader("Authorization") String authHeader,
-            HttpServletRequest httpRequest) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String jwt = authHeader.substring(7);
+    public ResponseEntity<?> logout(HttpServletRequest httpRequest, HttpServletResponse response) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getCredentials() instanceof String) {
+            String jwt = (String) authentication.getCredentials();
             String username = jwtService.extractUsername(jwt);
+            
             jwtBlacklistService.blacklistToken(jwt);
             securityLogger.logLogout(username, httpRequest.getRemoteAddr());
+            csrfTokenService.clearToken(httpRequest, response);
             return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
         }
-        return ResponseEntity.badRequest().body(Map.of("error", "Invalid token format"));
+        return ResponseEntity.ok(Map.of("message", "No active session to logout"));
     }
 
     @PostMapping("/refresh-csrf")
-    public ResponseEntity<Map<String, String>> refreshCsrfToken(HttpServletRequest request, HttpServletResponse response) {
-        // Get the current authentication
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "User not authenticated"));
-        }
-
-        // Generate new CSRF token
-        CsrfToken csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-        if (csrf != null) {
-            Cookie cookie = new Cookie("XSRF-TOKEN", csrf.getToken());
-            cookie.setPath("/");
-            cookie.setSecure(request.isSecure());
-            cookie.setHttpOnly(false);
-            cookie.setMaxAge(3600); // 1 hour
-            response.addCookie(cookie);
-            response.setHeader(csrf.getHeaderName(), csrf.getToken());
-
-            return ResponseEntity.ok(Map.of("csrfToken", csrf.getToken()));
-        }
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(Map.of("error", "Could not generate CSRF token"));
+    public ResponseEntity<?> refreshCsrfToken(HttpServletRequest request, HttpServletResponse response) {
+        CsrfToken newToken = csrfTokenService.generateToken(request, response);
+        return ResponseEntity.ok()
+                .header(newToken.getHeaderName(), newToken.getToken())
+                .build();
     }
 }
 

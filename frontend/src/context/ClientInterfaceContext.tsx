@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Client, Interface } from '../types';
+import { Client, Interface, PageResponse } from '../types';
 import { clientService } from '../services/clientService';
 import { interfaceService } from '../services/interfaceService';
 import { authService } from '../services/authService';
-import { tokenManager } from '../utils/tokenManager';
+import { tokenService } from '../services/tokenService';
 import { useNavigate } from 'react-router-dom';
 
 interface ClientInterfaceContextType {
@@ -56,7 +56,7 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
       console.log('Checking authentication...');
       try {
         // First check if we have a token
-        const token = tokenManager.getToken();
+        const token = tokenService.getAccessToken();
         if (!token) {
           console.log('No token found, clearing data');
           setIsAuthenticated(false);
@@ -102,13 +102,13 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
           setIsAuthenticated(false);
           setUserRoles([]);
           clearAllData();
-          tokenManager.clearTokens(); // Clear invalid token
+          tokenService.clearTokens(); // Clear invalid token
         }
       } catch (error) {
         console.error('Auth check error:', error);
         setIsAuthenticated(false);
         clearAllData();
-        tokenManager.clearTokens(); // Clear token on error
+        tokenService.clearTokens(); // Clear token on error
       }
     };
 

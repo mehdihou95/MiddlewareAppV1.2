@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -36,9 +37,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Collection;
 import jakarta.servlet.http.Cookie;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
@@ -56,92 +61,48 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
-
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider) {
-        this.jwtAuthFilter = jwtAuthFilter;
-        this.authenticationProvider = authenticationProvider;
-    }
+    private final CsrfTokenRepository csrfTokenRepository;
+    private final CsrfTokenRequestAttributeHandler csrfTokenRequestHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        tokenRepository.setCookiePath("/");
-        tokenRepository.setCookieName("XSRF-TOKEN");
-        tokenRepository.setHeaderName("X-XSRF-TOKEN");
-
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf
-                .csrfTokenRepository(tokenRepository)
-                .csrfTokenRequestHandler(requestHandler)
+                .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(csrfTokenRequestHandler)
                 .ignoringRequestMatchers(
                     "/api/auth/login",
                     "/api/auth/refresh",
-                    "/api/auth/refresh-csrf",
-                    "/api/auth/validate",
-                    "/h2-console/**",
-                    "/error",
-                    "/favicon.ico"
+                    "/api/auth/logout",
+                    "/api/public/**",
+                    "/error"
                 )
             )
-            .addFilterBefore(new OncePerRequestFilter() {
-                @Override
-                protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                        throws ServletException, IOException {
-                    CsrfToken csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-                    if (csrf != null) {
-                        String token = csrf.getToken();
-                        logger.info("CSRF Token in filter: " + token);
-                        response.setHeader(csrf.getHeaderName(), token);
-                        Cookie cookie = new Cookie("XSRF-TOKEN", token);
-                        cookie.setPath("/");
-                        cookie.setSecure(request.isSecure());
-                        cookie.setHttpOnly(false);
-                        cookie.setMaxAge(3600); // 1 hour
-                        response.addCookie(cookie);
-                    } else {
-                        logger.warn("No CSRF token found in request");
-                    }
-                    filterChain.doFilter(request, response);
-                }
-            }, CsrfFilter.class)
-            .addFilterAfter(new OncePerRequestFilter() {
-                @Override
-                protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                        throws ServletException, IOException {
-                    if (!request.getMethod().equals("GET")) {
-                        String headerToken = request.getHeader("X-XSRF-TOKEN");
-                        logger.info("CSRF Token in request header: " + (headerToken != null ? headerToken : "null"));
-                        
-                        String cookieToken = null;
-                        Cookie[] cookies = request.getCookies();
-                        if (cookies != null) {
-                            for (Cookie cookie : cookies) {
-                                if ("XSRF-TOKEN".equals(cookie.getName())) {
-                                    cookieToken = cookie.getValue();
-                                    break;
-                                }
-                            }
-                        }
-                        logger.info("CSRF Token in cookie: " + (cookieToken != null ? cookieToken : "null"));
-                    }
-                    filterChain.doFilter(request, response);
-                }
-            }, CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/error").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/favicon.ico").permitAll()
-                .requestMatchers("/api/clients/**").authenticated()
+                .requestMatchers(
+                    "/api/auth/login",
+                    "/api/auth/refresh",
+                    "/api/auth/logout",
+                    "/api/public/**",
+                    "/error"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers
-                .frameOptions(frame -> frame.sameOrigin())
+                .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                .contentTypeOptions(contentType -> contentType.disable())
+                .frameOptions(frame -> frame.deny())
                 .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("frame-ancestors 'self'")
+                    .policyDirectives("default-src 'self'; script-src 'self'; object-src 'none'; " +
+                                    "frame-ancestors 'self'; img-src 'self' data:; " +
+                                    "style-src 'self' 'unsafe-inline';")
+                )
+                .referrerPolicy(referrer -> referrer
+                    .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN)
+                )
+                .permissionsPolicy(permissions -> permissions
+                    .policy("camera=(), microphone=(), geolocation=()")
                 )
             )
             .sessionManagement(session -> session
