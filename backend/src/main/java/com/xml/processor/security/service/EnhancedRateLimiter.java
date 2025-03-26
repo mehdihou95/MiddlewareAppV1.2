@@ -6,188 +6,68 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 public class EnhancedRateLimiter {
-    
-    // Primary rate limit: 5 attempts per 5 minutes
     private static final int PRIMARY_MAX_ATTEMPTS = 5;
-    private static final int PRIMARY_WINDOW_MS = 300000;
-    
-    // Secondary rate limit: 10 attempts per hour across all IPs for a username
+    private static final long PRIMARY_WINDOW_MS = 300000; // 5 minutes
     private static final int SECONDARY_MAX_ATTEMPTS = 10;
-    private static final int SECONDARY_WINDOW_MS = 3600000;
-    
-    // Tertiary rate limit: Progressive backoff
-    private static final int MAX_BACKOFF_MINUTES = 60; // Max 1 hour backoff
-    
-    private final ConcurrentMap<String, AttemptInfo> ipAttempts = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, AttemptInfo> usernameAttempts = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, Integer> backoffMinutes = new ConcurrentHashMap<>();
-    
+    private static final long SECONDARY_WINDOW_MS = 3600000; // 1 hour
+    private static final long MAX_BACKOFF_MS = 3600000; // 1 hour
+
     private static class AttemptInfo {
-        final AtomicInteger count;
-        final Instant windowStart;
+        int count;
+        long windowStart;
+    }
 
-        AttemptInfo() {
-            this.count = new AtomicInteger(1);
-            this.windowStart = Instant.now();
-        }
-    }
-    
-    /**
-     * Checks if a request is within rate limits.
-     *
-     * @param ipAddress the IP address
-     * @param username the username (can be null)
-     * @return true if within limits, false if rate limited
-     */
-    public boolean checkRateLimit(String ipAddress, String username) {
-        cleanup();
-        
-        // Check IP-based rate limit
-        String ipKey = "ip:" + ipAddress;
-        if (!checkSingleRateLimit(ipKey, PRIMARY_MAX_ATTEMPTS, PRIMARY_WINDOW_MS)) {
-            log.warn("IP rate limit exceeded: {}", ipAddress);
-            return false;
-        }
-        
-        // Check username-based rate limit if username is provided
-        if (username != null && !username.isEmpty()) {
-            String usernameKey = "user:" + username;
-            if (!checkSingleRateLimit(usernameKey, SECONDARY_MAX_ATTEMPTS, SECONDARY_WINDOW_MS)) {
-                log.warn("Username rate limit exceeded: {}", username);
-                return false;
-            }
-            
-            // Check backoff
-            String backoffKey = ipAddress + ":" + username;
-            Integer backoffMinute = backoffMinutes.get(backoffKey);
-            if (backoffMinute != null) {
-                log.warn("Backoff active for {}:{} - {} minutes", ipAddress, username, backoffMinute);
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Checks a single rate limit.
-     *
-     * @param key the rate limit key
-     * @param maxAttempts the maximum attempts allowed
-     * @param windowMs the time window in milliseconds
-     * @return true if within limits, false if rate limited
-     */
-    private boolean checkSingleRateLimit(String key, int maxAttempts, int windowMs) {
-        AttemptInfo info = ipAttempts.compute(key, (k, v) -> {
-            if (v == null || isWindowExpired(v.windowStart, windowMs)) {
-                return new AttemptInfo();
-            }
-            v.count.incrementAndGet();
-            return v;
-        });
+    private final ConcurrentMap<String, AttemptInfo> attempts = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-        int attemptCount = info.count.get();
-        if (attemptCount > maxAttempts) {
-            return false;
-        }
+    public EnhancedRateLimiter() {
+        // Schedule cleanup every hour
+        scheduler.scheduleAtFixedRate(this::cleanup, 1, 1, TimeUnit.HOURS);
+    }
 
-        log.debug("Rate limit check for key: {}. Attempts: {}/{}", key, attemptCount, maxAttempts);
-        return true;
-    }
-    
-    /**
-     * Records a failed authentication attempt and applies progressive backoff.
-     *
-     * @param ipAddress the IP address
-     * @param username the username
-     */
-    public void recordFailedAttempt(String ipAddress, String username) {
-        if (username == null || username.isEmpty()) {
-            return;
+    public boolean checkRateLimit(String key) {
+        AttemptInfo info = attempts.computeIfAbsent(key, k -> new AttemptInfo());
+        
+        if (isWindowExpired(info)) {
+            info.count = 0;
+            info.windowStart = System.currentTimeMillis();
         }
         
-        String backoffKey = ipAddress + ":" + username;
-        Integer currentBackoff = backoffMinutes.get(backoffKey);
+        return info.count < PRIMARY_MAX_ATTEMPTS;
+    }
+
+    public void recordFailedAttempt(String key) {
+        AttemptInfo info = attempts.computeIfAbsent(key, k -> new AttemptInfo());
         
-        if (currentBackoff == null) {
-            // First failed attempt, set 1 minute backoff
-            backoffMinutes.put(backoffKey, 1);
-        } else {
-            // Progressive backoff - double the time up to max
-            int newBackoff = Math.min(currentBackoff * 2, MAX_BACKOFF_MINUTES);
-            backoffMinutes.put(backoffKey, newBackoff);
+        if (isWindowExpired(info)) {
+            info.count = 0;
+            info.windowStart = System.currentTimeMillis();
         }
         
-        log.info("Set backoff for {}:{} to {} minutes", ipAddress, username, backoffMinutes.get(backoffKey));
-    }
-    
-    /**
-     * Resets rate limits for a specific user.
-     *
-     * @param ipAddress the IP address
-     * @param username the username
-     */
-    public void resetLimit(String ipAddress, String username) {
-        if (ipAddress != null) {
-            ipAttempts.remove("ip:" + ipAddress);
-        }
+        info.count++;
         
-        if (username != null && !username.isEmpty()) {
-            usernameAttempts.remove("user:" + username);
-            
-            if (ipAddress != null) {
-                backoffMinutes.remove(ipAddress + ":" + username);
-            }
+        if (info.count >= PRIMARY_MAX_ATTEMPTS) {
+            log.warn("Rate limit exceeded for key: {}", key);
         }
-        
-        log.debug("Rate limit reset for IP: {}, username: {}", ipAddress, username);
     }
-    
-    /**
-     * Checks if a time window has expired.
-     *
-     * @param windowStart the start time of the window
-     * @param windowMs the window duration in milliseconds
-     * @return true if expired, false otherwise
-     */
-    private boolean isWindowExpired(Instant windowStart, int windowMs) {
-        return Instant.now().isAfter(windowStart.plusMillis(windowMs));
+
+    public void resetLimit(String key) {
+        attempts.remove(key);
     }
-    
-    /**
-     * Cleans up expired rate limit entries.
-     */
+
+    private boolean isWindowExpired(AttemptInfo info) {
+        return System.currentTimeMillis() - info.windowStart > PRIMARY_WINDOW_MS;
+    }
+
     private void cleanup() {
-        Instant now = Instant.now();
-        
-        // Clean up IP attempts
-        ipAttempts.entrySet().removeIf(entry -> 
-            isWindowExpired(entry.getValue().windowStart, PRIMARY_WINDOW_MS));
-        
-        // Clean up username attempts
-        usernameAttempts.entrySet().removeIf(entry -> 
-            isWindowExpired(entry.getValue().windowStart, SECONDARY_WINDOW_MS));
-        
-        // Clean up backoff entries (assume 1-day max backoff)
-        backoffMinutes.entrySet().removeIf(entry -> {
-            int backoffMs = entry.getValue() * 60 * 1000;
-            String[] parts = entry.getKey().split(":");
-            String ipAddress = parts[0];
-            String username = parts[1];
-            
-            String ipKey = "ip:" + ipAddress;
-            String usernameKey = "user:" + username;
-            
-            // If neither IP nor username has recent attempts, remove backoff
-            boolean ipHasAttempts = ipAttempts.containsKey(ipKey);
-            boolean usernameHasAttempts = usernameAttempts.containsKey(usernameKey);
-            
-            return !ipHasAttempts && !usernameHasAttempts;
-        });
+        attempts.entrySet().removeIf(entry -> 
+            System.currentTimeMillis() - entry.getValue().windowStart > SECONDARY_WINDOW_MS);
     }
 } 

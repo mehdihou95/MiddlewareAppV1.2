@@ -1,13 +1,11 @@
 package com.xml.processor.service.impl;
 
-import com.xml.processor.config.ClientContextHolder;
 import com.xml.processor.exception.ResourceNotFoundException;
 import com.xml.processor.exception.ValidationException;
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.Client;
 import com.xml.processor.repository.InterfaceRepository;
 import com.xml.processor.service.interfaces.InterfaceService;
-import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -17,11 +15,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
+import java.io.StringReader;
 
 /**
  * Primary implementation of the InterfaceService interface.
@@ -32,12 +35,10 @@ import java.util.stream.Collectors;
 public class InterfaceServiceImpl implements InterfaceService {
     
     private final InterfaceRepository interfaceRepository;
-    private final Validator validator;
     
     @Autowired
-    public InterfaceServiceImpl(InterfaceRepository interfaceRepository, Validator validator) {
+    public InterfaceServiceImpl(InterfaceRepository interfaceRepository) {
         this.interfaceRepository = interfaceRepository;
-        this.validator = validator;
     }
     
     @Override
@@ -166,8 +167,53 @@ public class InterfaceServiceImpl implements InterfaceService {
     
     @Override
     public Interface detectInterface(String xmlContent, Long clientId) {
-        // TODO: Implement XML content analysis to detect interface type
-        throw new UnsupportedOperationException("Interface detection not yet implemented");
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(new InputSource(new StringReader(xmlContent)));
+            Element root = document.getDocumentElement();
+            
+            // Check root element name
+            String rootName = root.getNodeName();
+            
+            // Check for specific elements that indicate interface type
+            if (root.getElementsByTagName("InvoiceNumber").getLength() > 0) {
+                return createInterface("INVOICE", rootName, clientId);
+            } else if (root.getElementsByTagName("OrderNumber").getLength() > 0) {
+                return createInterface("ORDER", rootName, clientId);
+            } else if (root.getElementsByTagName("ShipmentNumber").getLength() > 0) {
+                return createInterface("SHIPMENT", rootName, clientId);
+            }
+            
+            // Default fallback based on root element
+            if (rootName.contains("Invoice")) {
+                return createInterface("INVOICE", rootName, clientId);
+            } else if (rootName.contains("Order")) {
+                return createInterface("ORDER", rootName, clientId);
+            } else if (rootName.contains("Shipment")) {
+                return createInterface("SHIPMENT", rootName, clientId);
+            }
+            
+            throw new ValidationException("Could not detect interface type from XML content");
+        } catch (Exception e) {
+            throw new ValidationException("Failed to detect interface type: " + e.getMessage());
+        }
+    }
+    
+    private Interface createInterface(String type, String rootElement, Long clientId) {
+        Interface interfaceEntity = new Interface();
+        interfaceEntity.setType(type);
+        interfaceEntity.setRootElement(rootElement);
+        interfaceEntity.setNamespace("http://xml.processor.com/" + type.toLowerCase());
+        interfaceEntity.setActive(true);
+        interfaceEntity.setName(type + "_" + rootElement);
+        
+        Client client = new Client();
+        client.setId(clientId);
+        interfaceEntity.setClient(client);
+        
+        return interfaceEntity;
     }
     
     /**

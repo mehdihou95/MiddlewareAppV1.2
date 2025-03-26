@@ -1,46 +1,59 @@
 package com.xml.processor.model;
 
+import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
+@Data
 public class ErrorResponse {
     private int status;
-    private String error;
+    private String code;
     private String message;
     private LocalDateTime timestamp;
+    private List<String> errors;
     private List<String> details;
     private Map<String, String> fieldErrors;
     
-    public ErrorResponse(int status, String error, String message) {
+    public ErrorResponse(int status, String code, String message) {
         this.status = status;
-        this.error = error;
+        this.code = code;
         this.message = message;
         this.timestamp = LocalDateTime.now();
         this.fieldErrors = new HashMap<>();
     }
 
-    public ErrorResponse(int status, String error, String message, LocalDateTime timestamp) {
+    public ErrorResponse(int status, String code, String message, LocalDateTime timestamp) {
         this.status = status;
-        this.error = error;
+        this.code = code;
         this.message = message;
         this.timestamp = timestamp;
         this.fieldErrors = new HashMap<>();
     }
 
-    public ErrorResponse(int status, String error, String message, LocalDateTime timestamp, List<String> details) {
+    public ErrorResponse(int status, String code, String message, LocalDateTime timestamp, List<String> errors) {
         this.status = status;
-        this.error = error;
+        this.code = code;
         this.message = message;
         this.timestamp = timestamp;
+        this.errors = errors;
+        this.fieldErrors = new HashMap<>();
+    }
+
+    public ErrorResponse(int status, String code, String message, LocalDateTime timestamp, List<String> errors, List<String> details) {
+        this.status = status;
+        this.code = code;
+        this.message = message;
+        this.timestamp = timestamp;
+        this.errors = errors;
         this.details = details;
         this.fieldErrors = new HashMap<>();
     }
 
     public ErrorResponse(String code, String message) {
         this.status = 400;
-        this.error = code;
+        this.code = code;
         this.message = message;
         this.timestamp = LocalDateTime.now();
         this.fieldErrors = new HashMap<>();
@@ -55,12 +68,12 @@ public class ErrorResponse {
         this.status = status;
     }
 
-    public String getError() {
-        return error;
+    public String getCode() {
+        return code;
     }
 
-    public void setError(String error) {
-        this.error = error;
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getMessage() {
@@ -77,6 +90,14 @@ public class ErrorResponse {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public List<String> getErrors() {
+        return errors;
+    }
+
+    public void setErrors(List<String> errors) {
+        this.errors = errors;
     }
 
     public List<String> getDetails() {

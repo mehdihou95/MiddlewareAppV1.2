@@ -1,6 +1,6 @@
 package com.xml.processor.security.service;
 
-import com.xml.processor.config.JwtService;
+import com.xml.processor.security.service.JwtService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

@@ -1,6 +1,6 @@
 package com.xml.processor.service.impl;
 
-import com.xml.processor.config.JwtService;
+import com.xml.processor.security.service.JwtService;
 import com.xml.processor.security.service.JwtBlacklistService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

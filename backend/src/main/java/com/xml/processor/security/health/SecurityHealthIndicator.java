@@ -1,6 +1,6 @@
 package com.xml.processor.security.health;
 
-import com.xml.processor.config.JwtService;
+import com.xml.processor.security.service.JwtService;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;

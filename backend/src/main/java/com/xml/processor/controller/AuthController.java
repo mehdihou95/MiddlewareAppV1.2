@@ -1,8 +1,8 @@
 package com.xml.processor.controller;
 
-import com.xml.processor.config.JwtService;
+import com.xml.processor.security.service.JwtService;
 import com.xml.processor.model.RefreshTokenRequest;
-import com.xml.processor.service.impl.JwtBlacklistService;
+import com.xml.processor.security.service.JwtBlacklistService;
 import com.xml.processor.service.impl.SecurityLogger;
 import com.xml.processor.security.RateLimiter;
 import com.xml.processor.security.service.CsrfTokenService;
@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,7 +21,6 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 

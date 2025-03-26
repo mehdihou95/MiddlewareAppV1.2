@@ -1,5 +1,6 @@
-package com.xml.processor.config;
+package com.xml.processor.security.service;
 
+import com.xml.processor.config.ClientContextHolder;
 import com.xml.processor.exception.TokenException;
 import com.xml.processor.security.model.TokenType;
 import io.jsonwebtoken.Claims;
@@ -17,14 +18,18 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.security.Key;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -249,7 +254,7 @@ public class JwtService {
     }
 
     /**
-     * Gets the signing key for JWT tokens.
+     * Gets the signing key for JWT token generation and validation.
      *
      * @return the signing key
      */
@@ -259,23 +264,23 @@ public class JwtService {
     }
 
     /**
-     * Extracts a JWT token from an Authentication object.
+     * Gets the token from the current authentication.
      *
-     * @param authentication the Authentication object
-     * @return the JWT token, or null if not found
+     * @param authentication the current authentication
+     * @return the token
      */
     public String getTokenFromAuthentication(Authentication authentication) {
-        if (authentication != null && authentication.getCredentials() instanceof String) {
-            return (String) authentication.getCredentials();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
         }
-        return null;
+        return (String) authentication.getCredentials();
     }
-    
+
     /**
-     * Extracts a JWT token from an HTTP request.
+     * Extracts the token from the HTTP request.
      *
      * @param request the HTTP request
-     * @return the JWT token, or null if not found
+     * @return the token
      */
     public String extractTokenFromRequest(HttpServletRequest request) {
         final String authHeader = request.getHeader("Authorization");
@@ -284,55 +289,83 @@ public class JwtService {
         }
         return authHeader.substring(7);
     }
-    
+
     /**
-     * Generates a fingerprint for a token based on user details and request information.
+     * Generates a fingerprint for the current request context.
      *
      * @param userDetails the user details
      * @return the fingerprint
      */
     private String generateFingerprint(UserDetails userDetails) {
-        try {
-            HttpServletRequest request = 
-                ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-            String userAgent = request.getHeader("User-Agent");
-            String ipAddress = request.getRemoteAddr();
-            return DigestUtils.sha256Hex(userDetails.getUsername() + ":" + userAgent + ":" + ipAddress);
-        } catch (Exception e) {
-            log.warn("Could not generate token fingerprint: {}", e.getMessage());
-            return DigestUtils.sha256Hex(userDetails.getUsername() + ":unknown");
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return null;
         }
+
+        HttpServletRequest request = attributes.getRequest();
+        String userAgent = request.getHeader("User-Agent");
+        String ipAddress = request.getRemoteAddr();
+        String username = userDetails.getUsername();
+
+        String fingerprintData = String.format("%s:%s:%s", username, userAgent, ipAddress);
+        return DigestUtils.sha256Hex(fingerprintData);
     }
-    
+
     /**
-     * Generates a test token for health checks.
+     * Generates a test token for development purposes.
      *
-     * @return a test JWT token
+     * @return a test token
      */
     public String generateTestToken() {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("type", "TEST");
-        
-        return Jwts
-                .builder()
-                .setClaims(claims)
-                .setSubject("test-user")
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 60000)) // 1 minute
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
-                .compact();
+        return generateToken(new UserDetails() {
+            @Override
+            public Collection<? extends GrantedAuthority> getAuthorities() {
+                return Collections.singletonList(new SimpleGrantedAuthority("ROLE_TEST"));
+            }
+
+            @Override
+            public String getPassword() {
+                return null;
+            }
+
+            @Override
+            public String getUsername() {
+                return "test";
+            }
+
+            @Override
+            public boolean isAccountNonExpired() {
+                return true;
+            }
+
+            @Override
+            public boolean isAccountNonLocked() {
+                return true;
+            }
+
+            @Override
+            public boolean isCredentialsNonExpired() {
+                return true;
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return true;
+            }
+        });
     }
-    
+
     /**
      * Validates a test token.
      *
-     * @param token the test token
-     * @return true if valid, false otherwise
+     * @param token the token to validate
+     * @return true if the token is a valid test token
      */
     public boolean validateTestToken(String token) {
         try {
             Claims claims = extractAllClaims(token);
-            return "TEST".equals(claims.get("type")) && "test-user".equals(claims.getSubject());
+            return "test".equals(claims.getSubject()) &&
+                   claims.get("roles", List.class).contains("ROLE_TEST");
         } catch (Exception e) {
             return false;
         }

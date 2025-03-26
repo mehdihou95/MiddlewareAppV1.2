@@ -1,6 +1,6 @@
 package com.xml.processor.service.impl;
 
-import com.xml.processor.service.XmlValidationService;
+import com.xml.processor.service.interfaces.XmlValidationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;

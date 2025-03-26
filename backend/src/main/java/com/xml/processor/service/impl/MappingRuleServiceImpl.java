@@ -148,8 +148,7 @@ public class MappingRuleServiceImpl implements MappingRuleService {
     @Transactional(readOnly = true)
     public Page<MappingRule> getMappingRules(Pageable pageable, String nameFilter, Boolean isActiveFilter) {
         if (nameFilter != null && isActiveFilter != null) {
-            // TODO: Add repository method for combined filter
-            return mappingRuleRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
+            return mappingRuleRepository.findByNameContainingIgnoreCaseAndIsActive(nameFilter, isActiveFilter, pageable);
         } else if (nameFilter != null) {
             return mappingRuleRepository.findByNameContainingIgnoreCase(nameFilter, pageable);
         } else if (isActiveFilter != null) {

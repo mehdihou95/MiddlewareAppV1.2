@@ -10,7 +10,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
@@ -20,6 +24,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/interfaces")
+@Slf4j
 public class InterfaceController {
 
     private final InterfaceService interfaceService;
@@ -73,7 +78,7 @@ public class InterfaceController {
     @GetMapping("/client")
     public ResponseEntity<?> getInterfacesByCurrentClient() {
         try {
-            // Get the current client from the security context or ClientContextHolder
+            // Get the current client ID from the security context
             Long clientId = getCurrentClientId();
             if (clientId == null) {
                 return ResponseEntity.badRequest().build();
@@ -161,7 +166,18 @@ public class InterfaceController {
     }
 
     private Long getCurrentClientId() {
-        // TODO: Implement getting the current client ID from security context
+        // Get the current client ID from the security context
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            // Assuming the client ID is stored in the username field
+            try {
+                return Long.parseLong(userDetails.getUsername());
+            } catch (NumberFormatException e) {
+                log.error("Failed to parse client ID from username: {}", userDetails.getUsername());
+                return null;
+            }
+        }
         return null;
     }
 } 

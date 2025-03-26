@@ -87,4 +87,7 @@ public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> 
     
     @Query("SELECT m FROM MappingRule m WHERE m.client.id = ?1 AND m.isActive = true")
     Page<MappingRule> findByClient_IdAndIsActiveTrue(Long clientId, Pageable pageable);
+
+    @Query("SELECT m FROM MappingRule m WHERE m.name LIKE %?1% AND m.isActive = ?2")
+    Page<MappingRule> findByNameContainingIgnoreCaseAndIsActive(String name, boolean isActive, Pageable pageable);
 } 
