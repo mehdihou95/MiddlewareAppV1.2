@@ -114,20 +114,22 @@ export const clientService = {
         }
     },
 
-    onboardNewClient: async (clientData: ClientOnboardingData): Promise<Client> => {
-        const response = await api.post<Client>(`${API_URL}/clients/onboarding/new`, clientData);
-        return response.data;
+    onboardNewClient: async (clientData: ClientInput): Promise<Client> => {
+        try {
+            const response = await api.post<Client>('/clients/onboarding/new', clientData);
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
     },
 
-    cloneClient: async (
-        sourceClientId: number,
-        newClientData: ClientOnboardingData
-    ): Promise<Client> => {
-        const response = await api.post<Client>(
-            `${API_URL}/clients/onboarding/clone/${sourceClientId}`,
-            newClientData
-        );
-        return response.data;
+    cloneClientConfiguration: async (sourceClientId: number, newClientData: ClientInput): Promise<Client> => {
+        try {
+            const response = await api.post<Client>(`/clients/onboarding/clone/${sourceClientId}`, newClientData);
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
     },
 
     searchClients: async (

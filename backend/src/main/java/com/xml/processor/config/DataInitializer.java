@@ -29,6 +29,7 @@ public class DataInitializer implements CommandLineRunner {
             User adminUser = new User();
             adminUser.setUsername("admin");
             adminUser.setPassword(passwordEncoder.encode("admin"));
+            adminUser.setEmail("admin@example.com");
             Set<String> adminRoles = new HashSet<>();
             adminRoles.add("ROLE_ADMIN");
             adminUser.setRoles(adminRoles);
@@ -41,6 +42,7 @@ public class DataInitializer implements CommandLineRunner {
             User regularUser = new User();
             regularUser.setUsername("user");
             regularUser.setPassword(passwordEncoder.encode("user"));
+            regularUser.setEmail("user@example.com");
             Set<String> userRoles = new HashSet<>();
             userRoles.add("ROLE_USER");
             regularUser.setRoles(userRoles);

@@ -26,13 +26,28 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         
         // Add security headers
         response.setHeader("X-Content-Type-Options", "nosniff");
-        response.setHeader("X-Frame-Options", "DENY");
+        
+        // Allow H2 Console to be displayed in iframe
+        if (request.getRequestURI().startsWith("/h2-console")) {
+            response.setHeader("X-Frame-Options", "SAMEORIGIN");
+        } else {
+            response.setHeader("X-Frame-Options", "DENY");
+        }
+        
         response.setHeader("X-XSS-Protection", "1; mode=block");
         response.setHeader("Referrer-Policy", "same-origin");
         response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-        response.setHeader("Content-Security-Policy", 
-            "default-src 'self'; script-src 'self'; object-src 'none'; " +
-            "frame-ancestors 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';");
+        
+        // Modify CSP for H2 Console
+        if (request.getRequestURI().startsWith("/h2-console")) {
+            response.setHeader("Content-Security-Policy", 
+                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+                "style-src 'self' 'unsafe-inline'; frame-ancestors 'self';");
+        } else {
+            response.setHeader("Content-Security-Policy", 
+                "default-src 'self'; script-src 'self'; object-src 'none'; " +
+                "frame-ancestors 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';");
+        }
         
         // Cache control for sensitive pages
         if (request.getRequestURI().startsWith("/api/auth/") || 

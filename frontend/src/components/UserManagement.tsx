@@ -34,7 +34,7 @@ import {
 } from '@mui/icons-material';
 import { userService } from '../services/userService';
 import { User } from '../types';
-import { handleApiError, isValidationError, getValidationErrors } from '../utils/errorHandler';
+import { handleApiError, isValidationError, getValidationErrors, ApiError } from '../utils/errorHandler';
 
 interface UserFormData {
     username: string;
@@ -102,7 +102,7 @@ const UserManagement: React.FC = () => {
             setUsers(response.content);
             setTotalElements(response.totalElements);
         } catch (error) {
-            const apiError = handleApiError(error);
+            const apiError = handleApiError(error) as ApiError;
             showSnackbar(apiError.message, 'error');
         }
     };
@@ -175,7 +175,7 @@ const UserManagement: React.FC = () => {
                 const validationErrors = getValidationErrors(error);
                 validationErrors.forEach(error => showSnackbar(error, 'error'));
             } else {
-                const apiError = handleApiError(error);
+                const apiError = handleApiError(error) as ApiError;
                 showSnackbar(apiError.message, 'error');
             }
         }
@@ -188,7 +188,7 @@ const UserManagement: React.FC = () => {
                 showSnackbar('User deleted successfully', 'success');
                 fetchUsers();
             } catch (error) {
-                const apiError = handleApiError(error);
+                const apiError = handleApiError(error) as ApiError;
                 showSnackbar(apiError.message, 'error');
             }
         }
@@ -200,7 +200,7 @@ const UserManagement: React.FC = () => {
             showSnackbar('Account unlocked successfully', 'success');
             fetchUsers();
         } catch (error) {
-            const apiError = handleApiError(error);
+            const apiError = handleApiError(error) as ApiError;
             showSnackbar(apiError.message, 'error');
         }
     };

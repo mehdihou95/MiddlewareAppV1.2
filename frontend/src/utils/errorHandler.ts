@@ -1,81 +1,49 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import { ApiError, ErrorResponse, ValidationError } from '../types/error';
 
-export interface ApiError {
-    message: string;
-    status?: number;
-    code?: string;
-    details?: any;
-}
-
-export class ApiException extends Error implements ApiError {
-    constructor(
-        public message: string,
-        public status?: number,
-        public code?: string,
-        public details?: any
-    ) {
-        super(message);
-        this.name = 'ApiException';
-    }
-}
-
-interface AxiosErrorResponse {
-    message: string;
-    code?: string;
-    details?: any;
-}
+export type { ApiError };
 
 export const handleApiError = (error: unknown): ApiError => {
-    if (error instanceof ApiException) {
-        return error;
-    }
+    if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError<ErrorResponse>;
+        const errorResponse = axiosError.response?.data;
 
-    // Type guard for Axios error
-    const isAxiosError = (error: unknown): error is any => {
-        return typeof error === 'object' && error !== null && 'isAxiosError' in error;
-    };
-
-    if (isAxiosError(error)) {
-        const { response, message } = error;
-        
-        if (response?.data) {
-            const { status, data } = response;
-            return {
-                message: data.message || message,
-                status,
-                code: data.code,
-                details: data.details
+        if (errorResponse) {
+            const apiError: ApiError = {
+                code: errorResponse.code || 'UNKNOWN_ERROR',
+                message: errorResponse.message || 'An unexpected error occurred',
+                details: errorResponse.details,
+                timestamp: errorResponse.timestamp,
+                path: errorResponse.path,
+                status: axiosError.response?.status,
             };
+
+            // Handle validation errors if present
+            if (axiosError.response?.status === 400 && errorResponse.details) {
+                const validationErrors = Array.isArray(errorResponse.details)
+                    ? errorResponse.details.map((detail: string) => {
+                        const [field, message] = detail.split(': ');
+                        return { field, message };
+                    })
+                    : [];
+                apiError.validationErrors = validationErrors;
+            }
+
+            return apiError;
         }
-        
-        return {
-            message: message || 'Network error occurred',
-            status: 500
-        };
     }
 
-    // Type guard for Error object
-    const isError = (error: unknown): error is Error => {
-        return error instanceof Error;
+    // Handle non-Axios errors
+    const unknownError: ApiError = {
+        code: 'UNKNOWN_ERROR',
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
     };
 
-    if (isError(error)) {
-        const err = error as Error;
-        return {
-            message: err.message,
-            status: 500
-        };
-    }
-
-    return {
-        message: 'An unexpected error occurred',
-        status: 500
-    };
+    return unknownError;
 };
 
 export const isApiError = (error: unknown): error is ApiError => {
-    return error instanceof ApiException || 
-           (typeof error === 'object' && error !== null && 'message' in error);
+    return typeof error === 'object' && error !== null && 'message' in error && 'code' in error;
 };
 
 export const getErrorMessage = (error: unknown): string => {
@@ -89,12 +57,12 @@ export const getErrorMessage = (error: unknown): string => {
 };
 
 export const isAuthenticationError = (error: unknown): boolean => {
-    if (error instanceof ApiException) {
+    if (isApiError(error)) {
         return error.status === 401 || error.status === 403;
     }
 
     // Type guard for Axios error
-    const isAxiosError = (error: unknown): error is any => {
+    const isAxiosError = (error: unknown): error is AxiosError => {
         return typeof error === 'object' && error !== null && 'isAxiosError' in error;
     };
 
