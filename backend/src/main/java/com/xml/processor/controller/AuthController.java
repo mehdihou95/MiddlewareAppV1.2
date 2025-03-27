@@ -169,25 +169,42 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest httpRequest, HttpServletResponse response) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getCredentials() instanceof String) {
-            String jwt = (String) authentication.getCredentials();
-            String username = jwtService.extractUsername(jwt);
-            
-            jwtBlacklistService.blacklistToken(jwt);
-            securityLogger.logLogout(username, httpRequest.getRemoteAddr());
-            csrfTokenService.clearToken(httpRequest, response);
-            return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null) {
+                String username = authentication.getName();
+                
+                // Get the token from the Authorization header
+                String authHeader = httpRequest.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String jwt = authHeader.substring(7);
+                    jwtBlacklistService.blacklistToken(jwt);
+                }
+                
+                securityLogger.logLogout(username, httpRequest.getRemoteAddr());
+                csrfTokenService.clearToken(httpRequest, response);
+                
+                // Clear the security context
+                SecurityContextHolder.clearContext();
+                
+                return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+            }
+            return ResponseEntity.ok(Map.of("message", "No active session to logout"));
+        } catch (Exception e) {
+            logger.error("Error during logout", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Error during logout"));
         }
-        return ResponseEntity.ok(Map.of("message", "No active session to logout"));
     }
 
     @PostMapping("/refresh-csrf")
     public ResponseEntity<?> refreshCsrfToken(HttpServletRequest request, HttpServletResponse response) {
         CsrfToken newToken = csrfTokenService.generateToken(request, response);
+        
+        // Return token in both header and body
         return ResponseEntity.ok()
                 .header(newToken.getHeaderName(), newToken.getToken())
-                .build();
+                .body(Map.of("csrfToken", newToken.getToken()));
     }
 }
 

@@ -4,21 +4,21 @@
 The XML Middleware Application is a multi-tenant system designed to process and transform XML documents according to client-specific rules. It provides a secure, scalable platform for handling XML data transformation with support for multiple clients and interfaces.
 
 ## 2. User Roles and Access Control
-### 2.1 Admin Users
+### 2.1 Admin Users (ROLE_ADMIN)
 - Full system access
-- Client management capabilities
+- Client management capabilities (Create, Read, Update, Delete)
 - Interface configuration
 - Mapping rule management
 - User management
 - Audit log access
 - System monitoring
 
-### 2.2 Client Users
-- Access to client-specific data only
-- XML file upload and processing
-- View processing history
-- Manage client-specific mapping rules
-- View client-specific audit logs
+### 2.2 Regular Users (ROLE_USER)
+- Read-only access to client data
+- View client list and details
+- View interfaces
+- View mapping rules
+- View audit logs for assigned clients
 
 ## 3. Core Features
 
@@ -32,18 +32,60 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 - Session invalidation on logout
 - Password encryption with BCrypt
 - Failed login attempt tracking
+- CSRF protection for non-GET requests
+- Token blacklisting on logout
+- Debug logging for authentication process
+- Client context management in requests
 
 ### 3.2 Client Management
-- Create and manage client profiles with status tracking
-- Configure client-specific settings and interfaces
-- Monitor client performance metrics
-- Manage client access permissions and roles
-- Client-specific audit logging with detailed tracking
-- Client data isolation enforcement
-- Automatic client status updates
-- Client interface version management
+- Create and manage client profiles
+- Client status tracking (active/inactive)
+- Client code validation (regex: ^[A-Z0-9-_]+$)
+- Client name uniqueness enforcement
+- Client-specific settings
+- Role-based access to client operations:
+  * ADMIN: Full CRUD operations
+  * USER: Read-only access
+- Client context isolation
+- Client selection in UI
+- Client data persistence in H2 database
 
-### 3.3 XML Processing
+### 3.3 Security Features
+- HTTPS encryption for all communications
+- CSRF token protection
+- JWT token validation and refresh
+- Role-based endpoint security
+- Client context isolation
+- Token blacklisting
+- Secure password storage
+- Rate limiting for login attempts
+- Debug logging for security operations
+- Session management
+
+### 3.4 Frontend Features
+- Modern Material-UI based interface
+- Responsive design
+- Client management dashboard
+- User authentication flows
+- Token management
+- CSRF token handling
+- Error handling and display
+- Loading states
+- Navigation guards
+- Role-based UI elements
+
+### 3.5 API Security
+- JWT authentication required for all non-auth endpoints
+- CSRF token required for state-changing operations
+- Role-based endpoint access control
+- Client context validation
+- Rate limiting
+- Error handling with appropriate status codes
+- Secure header management
+- Token refresh mechanism
+- Debug logging for API operations
+
+### 3.6 XML Processing
 - Upload XML files
 - Validate against XSD schemas
 - Transform according to mapping rules
@@ -53,7 +95,7 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 - Retry mechanism for failed processing
 - Comprehensive error handling
 
-### 3.4 Mapping Rules
+### 3.7 Mapping Rules
 - Create and edit mapping rules
 - Rule validation
 - Version control for rules
@@ -61,14 +103,14 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 - Support for complex transformations
 - Client-specific rule management
 
-### 3.5 Interface Management
+### 3.8 Interface Management
 - Configure input/output interfaces
 - Define interface schemas
 - Manage interface versions
 - Monitor interface performance
 - Interface-specific validation
 
-### 3.6 Audit Logging
+### 3.9 Audit Logging
 - Comprehensive activity tracking
 - User action logging
 - System event logging
@@ -193,4 +235,58 @@ The XML Middleware Application is a multi-tenant system designed to process and 
 - Regular backup procedures
 - Comprehensive audit logging
 - Error recovery procedures
-- Performance monitoring 
+- Performance monitoring
+
+## 11. Technical Implementation Details
+
+### 11.1 Authentication Flow
+1. User submits login credentials
+2. Backend validates credentials and generates tokens
+3. Frontend stores tokens securely
+4. Access token used for subsequent requests
+5. Refresh token used to obtain new access token
+6. CSRF token included in state-changing requests
+7. Tokens cleared on logout
+
+### 11.2 Client Management Flow
+1. Admin creates new client with unique name and code
+2. Client status set to active/inactive
+3. Client data isolated by context
+4. Users assigned appropriate roles for client access
+5. Client operations logged for audit purposes
+
+### 11.3 Security Measures
+1. BCrypt password encryption
+2. JWT token validation
+3. CSRF protection
+4. Role-based access control
+5. Client context isolation
+6. Rate limiting
+7. Token blacklisting
+8. Secure session management
+
+## 12. Current Limitations and Future Enhancements
+1. Enhanced password policies
+2. Multi-factor authentication
+3. OAuth2 integration
+4. Advanced client configuration options
+5. Improved audit logging
+6. Enhanced monitoring capabilities
+7. Automated testing coverage
+8. Performance optimization
+
+## 13. Known Issues
+1. Token refresh edge cases
+2. Client context persistence
+3. Role prefix handling in authentication
+4. CSRF token refresh scenarios
+5. Error message standardization
+
+## 14. Development Status
+- Authentication system: Implemented
+- Client management: Basic implementation complete
+- Role-based access: Implemented
+- Security features: Core implementation complete
+- Frontend UI: Basic implementation complete
+- API endpoints: Core endpoints implemented
+- Database: H2 implementation complete 

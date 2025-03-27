@@ -4,7 +4,6 @@ import com.xml.processor.model.Client;
 import com.xml.processor.model.Interface;
 import com.xml.processor.service.interfaces.ClientService;
 import com.xml.processor.service.interfaces.InterfaceService;
-import com.xml.processor.dto.ClientOnboardingDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -106,20 +105,5 @@ public class ClientController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
-    }
-
-    @PostMapping("/onboarding/new")
-    public ResponseEntity<Client> onboardNewClient(@RequestBody ClientOnboardingDTO clientData) {
-        Client client = clientService.onboardNewClient(clientData);
-        return ResponseEntity.ok(client);
-    }
-
-    @PostMapping("/onboarding/clone/{sourceClientId}")
-    public ResponseEntity<Client> cloneClient(
-        @PathVariable Long sourceClientId,
-        @RequestBody ClientOnboardingDTO clientData
-    ) {
-        Client client = clientService.cloneClient(sourceClientId, clientData);
-        return ResponseEntity.ok(client);
     }
 } 

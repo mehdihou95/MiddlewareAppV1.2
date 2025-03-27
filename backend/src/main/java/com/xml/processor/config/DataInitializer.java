@@ -24,27 +24,27 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Create admin user with ROLE_ADMIN
+        // Create admin user with ADMIN role
         if (!userRepository.existsByUsername("admin")) {
             User adminUser = new User();
             adminUser.setUsername("admin");
             adminUser.setPassword(passwordEncoder.encode("admin"));
             adminUser.setEmail("admin@example.com");
             Set<String> adminRoles = new HashSet<>();
-            adminRoles.add("ROLE_ADMIN");
+            adminRoles.add("ADMIN");
             adminUser.setRoles(adminRoles);
             userRepository.save(adminUser);
             logger.info("Created admin user with ADMIN role");
         }
         
-        // Create regular user with ROLE_USER
+        // Create regular user with USER role
         if (!userRepository.existsByUsername("user")) {
             User regularUser = new User();
             regularUser.setUsername("user");
             regularUser.setPassword(passwordEncoder.encode("user"));
             regularUser.setEmail("user@example.com");
             Set<String> userRoles = new HashSet<>();
-            userRoles.add("ROLE_USER");
+            userRoles.add("USER");
             regularUser.setRoles(userRoles);
             userRepository.save(regularUser);
             logger.info("Created regular user with USER role");

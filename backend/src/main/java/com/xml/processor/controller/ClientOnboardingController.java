@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
     
 @RestController
-@RequestMapping("/api/client-onboarding")
+@RequestMapping("/api/clients/onboarding")
 public class ClientOnboardingController {
     
     private final ClientOnboardingService clientOnboardingService;

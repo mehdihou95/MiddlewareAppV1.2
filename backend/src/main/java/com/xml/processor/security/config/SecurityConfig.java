@@ -18,7 +18,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -34,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import com.xml.processor.security.filter.JwtAuthenticationFilter;
+import com.xml.processor.filter.ClientContextFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -57,6 +57,7 @@ public class SecurityConfig {
     private final AuthenticationProvider authenticationProvider;
     private final CsrfTokenRepository csrfTokenRepository;
     private final CsrfTokenRequestAttributeHandler csrfTokenRequestHandler;
+    private final ClientContextFilter clientContextFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -65,12 +66,25 @@ public class SecurityConfig {
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Client endpoints
+                .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.POST, "/api/clients/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasRole("ADMIN")
+                // Interface endpoints
+                .requestMatchers(HttpMethod.GET, "/api/interfaces/**").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.POST, "/api/interfaces/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/interfaces/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/interfaces/**").hasRole("ADMIN")
+                // Default deny
                 .anyRequest().authenticated()
             )
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/h2-console/**")
                 .ignoringRequestMatchers("/api/auth/login", "/api/auth/refresh")
+                .ignoringRequestMatchers("/api/auth/refresh-csrf")
                 .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(csrfTokenRequestHandler)
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.sameOrigin())
@@ -78,8 +92,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .authenticationProvider(authenticationProvider);
+
+        // Add filters in the correct order using addFilterBefore
+        http.addFilterBefore(clientContextFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -89,7 +106,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-XSRF-TOKEN", "X-Requested-With", "Accept", "Origin"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-XSRF-TOKEN", "X-Requested-With", "Accept", "Origin", "X-Client-ID"));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "X-XSRF-TOKEN"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

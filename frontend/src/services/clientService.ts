@@ -45,43 +45,55 @@ export const clientService = {
     createClient: async (client: Omit<Client, 'id'>): Promise<Client> => {
         console.log('ClientService: Attempting to create client:', client);
         try {
-            console.log('ClientService: Making POST request to:', `${API_URL}/clients`);
-            console.log('ClientService: Request payload:', client);
+            // Log the full request URL and configuration
+            const url = `${API_URL}/clients`;
+            console.log('ClientService: Full request URL:', url);
+            console.log('ClientService: Request configuration:', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                data: client
+            });
             
-            const response = await api.post<Client>(`${API_URL}/clients`, client, {
+            const response = await api.post<Client>(url, client, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
             
+            // Log the complete response
             console.log('ClientService: Create client response:', {
                 status: response.status,
+                statusText: response.statusText,
                 headers: response.headers,
                 data: response.data
             });
             
             if (!response.data) {
+                console.error('ClientService: No data received from server');
                 throw new Error('No data received from server');
             }
             
+            console.log('ClientService: Client created successfully:', response.data);
             return response.data;
         } catch (error: any) {
+            // Enhanced error logging
             console.error('ClientService: Error creating client:', {
-                error,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers
+                error: error.message,
+                response: {
+                    data: error.response?.data,
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    headers: error.response?.headers
+                },
+                request: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    headers: error.config?.headers,
+                    data: error.config?.data
+                }
             });
-            
-            // Log the request that was made
-            if (error.config) {
-                console.log('ClientService: Failed request details:', {
-                    url: error.config.url,
-                    method: error.config.method,
-                    headers: error.config.headers,
-                    data: error.config.data
-                });
-            }
             
             throw handleApiError(error);
         }

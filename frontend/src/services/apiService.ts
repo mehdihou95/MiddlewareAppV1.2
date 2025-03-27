@@ -40,19 +40,42 @@ const createApiInstance = (): AxiosInstance => {
         config.headers = {} as AxiosRequestHeaders;
       }
       
+      // Debug: Log request details
+      console.log('Making request to:', config.url);
+      console.log('Request method:', config.method);
+      
       // Skip auth token for auth endpoints
       if (!config.url?.includes('/auth/')) {
         const token = tokenService.getAccessToken();
+        console.log('Token retrieval attempt');
+        console.log('Token found:', token ? 'Yes' : 'No');
+        
         if (token) {
+          // Debug: Log token details
+          try {
+            const tokenPayload = tokenService.getTokenPayload();
+            console.log('Token payload:', tokenPayload);
+            console.log('Token roles:', tokenPayload?.roles);
+          } catch (e) {
+            console.error('Error parsing token:', e);
+          }
+          
           config.headers['Authorization'] = `Bearer ${token}`;
+          console.log('Added Authorization header:', `Bearer ${token.substring(0, 10)}...`);
+        } else {
+          console.warn('No token available for request to:', config.url);
         }
+      } else {
+        console.log('Skipping auth token for auth endpoint');
       }
       
       // Add CSRF token for non-GET requests
       if (config.method?.toUpperCase() !== 'GET') {
         const csrfToken = tokenService.getCsrfToken();
+        console.log('CSRF token found:', csrfToken ? 'Yes' : 'No');
         if (csrfToken) {
-          config.headers['X-CSRF-TOKEN'] = csrfToken;
+          config.headers['X-XSRF-TOKEN'] = csrfToken;
+          console.log('Added CSRF token header');
         }
       }
       
@@ -60,7 +83,17 @@ const createApiInstance = (): AxiosInstance => {
       const clientId = localStorage.getItem('selectedClientId');
       if (clientId) {
         config.headers['X-Client-ID'] = clientId;
+        console.log('Added Client ID header:', clientId);
       }
+      
+      // Log final request configuration
+      console.log('Final request headers:', config.headers);
+      console.log('Final request configuration:', {
+        url: config.url,
+        method: config.method,
+        baseURL: config.baseURL,
+        withCredentials: config.withCredentials
+      });
       
       return config;
     },
@@ -72,8 +105,28 @@ const createApiInstance = (): AxiosInstance => {
   
   // Configure response interceptor
   instance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      // Debug: Log response details
+      console.log('Response received from:', response.config.url);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      // Store CSRF token from response headers if present
+      const csrfToken = response.headers['x-xsrf-token'];
+      if (csrfToken) {
+        console.log('New CSRF token received');
+        tokenService.setCsrfToken(csrfToken);
+      }
+      return response;
+    },
     async (error: AxiosError) => {
+      // Debug: Log error details
+      console.error('Response error:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        message: error.message
+      });
+      
       const originalRequest = error.config as RetryConfig;
       if (!originalRequest) {
         return Promise.reject(error);
@@ -81,11 +134,13 @@ const createApiInstance = (): AxiosInstance => {
       
       // Handle CSRF token expiration (403 Forbidden)
       if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+        console.log('Attempting CSRF token refresh');
         originalRequest._csrfRetry = true;
         
         try {
           const response = await instance.post<{ csrfToken: string }>('/auth/refresh-csrf');
           if (response.data.csrfToken) {
+            console.log('New CSRF token obtained');
             tokenService.setCsrfToken(response.data.csrfToken);
             
             if (!originalRequest.headers) {
@@ -103,6 +158,7 @@ const createApiInstance = (): AxiosInstance => {
       
       // Handle JWT token expiration (401 Unauthorized)
       if (error.response?.status === 401 && !originalRequest._retry) {
+        console.log('Attempting token refresh');
         originalRequest._retry = true;
         
         try {
@@ -114,6 +170,7 @@ const createApiInstance = (): AxiosInstance => {
           const response = await instance.post<TokenResponse>('/auth/refresh', { refreshToken });
           const { token, refreshToken: newRefreshToken } = response.data;
           
+          console.log('New tokens obtained');
           tokenService.setTokens(token, newRefreshToken);
           
           if (!originalRequest.headers) {
