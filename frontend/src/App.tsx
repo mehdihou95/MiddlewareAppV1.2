@@ -124,9 +124,11 @@ const App: React.FC = () => {
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <ClientInterfaceProvider>
-            <AppContent />
-          </ClientInterfaceProvider>
+          <Router>
+            <ClientInterfaceProvider>
+              <AppContent />
+            </ClientInterfaceProvider>
+          </Router>
         </ThemeProvider>
       </AuthProvider>
     </ErrorBoundary>

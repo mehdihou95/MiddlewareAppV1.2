@@ -90,4 +90,12 @@ public interface MappingRuleRepository extends JpaRepository<MappingRule, Long> 
 
     @Query("SELECT m FROM MappingRule m WHERE m.name LIKE %?1% AND m.isActive = ?2")
     Page<MappingRule> findByNameContainingIgnoreCaseAndIsActive(String name, boolean isActive, Pageable pageable);
+
+    /**
+     * Delete all mapping rules for a specific interface
+     *
+     * @param interfaceId The ID of the interface
+     */
+    @Query("DELETE FROM MappingRule m WHERE m.interfaceEntity.id = ?1")
+    void deleteByInterfaceId(Long interfaceId);
 } 

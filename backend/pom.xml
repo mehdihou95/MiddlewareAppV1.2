@@ -120,18 +120,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Redis for distributed data structures -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-
-        <!-- Session management -->
-        <dependency>
-            <groupId>org.springframework.session</groupId>
-            <artifactId>spring-session-data-redis</artifactId>
-        </dependency>
-
         <!-- Metrics and monitoring -->
         <dependency>
             <groupId>io.micrometer</groupId>

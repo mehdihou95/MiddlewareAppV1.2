@@ -1,6 +1,7 @@
 package com.xml.processor.service.interfaces;
 
 import com.xml.processor.model.Client;
+import com.xml.processor.dto.ClientOnboardingDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.util.Optional;
@@ -92,4 +93,21 @@ public interface ClientService {
      * @return Page of inactive clients
      */
     Page<Client> findInactiveClients(Pageable pageable);
+
+    /**
+     * Onboard a new client with the provided data.
+     *
+     * @param clientData The client onboarding data
+     * @return The newly created client
+     */
+    Client onboardNewClient(ClientOnboardingDTO clientData);
+
+    /**
+     * Clone an existing client with new data.
+     *
+     * @param sourceClientId The ID of the client to clone
+     * @param clientData The new client data
+     * @return The newly created cloned client
+     */
+    Client cloneClient(Long sourceClientId, ClientOnboardingDTO clientData);
 } 

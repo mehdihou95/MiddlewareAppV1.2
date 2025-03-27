@@ -1,6 +1,7 @@
 import { api, apiService } from './apiService';
 import { tokenService, TokenResponse } from './tokenService';
 import { handleApiError } from '../utils/errorHandler';
+import { ENDPOINTS } from '../config/apiConfig';
 
 export interface LoginCredentials {
     username: string;
@@ -35,7 +36,7 @@ export const authService = {
     login: async (username: string, password: string): Promise<LoginResponse> => {
         console.log('Attempting login for user:', username);
         try {
-            const response = await api.post<LoginResponse>('/auth/login', { 
+            const response = await api.post<LoginResponse>(ENDPOINTS.AUTH.LOGIN, { 
                 username: username.trim(), 
                 password: password.trim() 
             });
@@ -60,13 +61,19 @@ export const authService = {
         console.log('Logging out user');
         try {
             // Call logout endpoint
-            await api.post('/auth/logout');
+            await api.post(ENDPOINTS.AUTH.LOGOUT);
         } catch (error) {
             console.error('Logout API call failed:', error);
             // Continue with logout process regardless of API call result
         } finally {
-            // Clear tokens and redirect
+            // Clear tokens and API configuration
             tokenService.clearTokens();
+            delete api.defaults.headers.common['Authorization'];
+            delete api.defaults.headers.common['X-XSRF-TOKEN'];
+            // Reset API instance
+            api.interceptors.request.clear();
+            api.interceptors.response.clear();
+            // Redirect to login
             window.location.href = '/login';
         }
     },
@@ -85,7 +92,7 @@ export const authService = {
         }
 
         try {
-            const response = await api.post<LoginResponse>('/auth/refresh', {
+            const response = await api.post<LoginResponse>(ENDPOINTS.AUTH.REFRESH, {
                 refreshToken: refreshToken
             });
             console.log('Token refresh successful');
@@ -100,7 +107,7 @@ export const authService = {
 
     validateToken: async (): Promise<ValidateTokenResponse> => {
         try {
-            const response = await api.get<ValidateTokenResponse>('/auth/validate');
+            const response = await api.get<ValidateTokenResponse>(ENDPOINTS.AUTH.VALIDATE);
             return response.data;
         } catch (error) {
             console.error('Token validation failed:', error);
@@ -114,7 +121,7 @@ export const authService = {
 
     getCurrentUser: async (): Promise<User> => {
         try {
-            return await apiService.get<User>('/user');
+            return await apiService.get<User>(ENDPOINTS.USER.CURRENT);
         } catch (error) {
             throw apiService.handleError(error);
         }

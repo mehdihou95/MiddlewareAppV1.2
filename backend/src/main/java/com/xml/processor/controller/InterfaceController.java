@@ -1,6 +1,7 @@
 package com.xml.processor.controller;
 
 import com.xml.processor.model.Interface;
+import com.xml.processor.model.MappingRule;
 import com.xml.processor.model.ErrorResponse;
 import com.xml.processor.service.interfaces.InterfaceService;
 import com.xml.processor.validation.InterfaceValidator;
@@ -160,6 +161,39 @@ public class InterfaceController {
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "INTERNAL_ERROR",
                 "An unexpected error occurred while deleting the interface"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/{id}/mappings")
+    public ResponseEntity<?> getInterfaceMappings(@PathVariable Long id) {
+        try {
+            List<MappingRule> mappings = interfaceService.getInterfaceMappings(id);
+            return ResponseEntity.ok(mappings);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while retrieving interface mappings"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PutMapping("/{id}/mappings")
+    public ResponseEntity<?> updateInterfaceMappings(
+        @PathVariable Long id,
+        @RequestBody List<MappingRule> mappings
+    ) {
+        try {
+            List<MappingRule> updatedMappings = interfaceService.updateInterfaceMappings(id, mappings);
+            return ResponseEntity.ok(updatedMappings);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                "An unexpected error occurred while updating interface mappings"
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }

@@ -3,7 +3,7 @@ package com.xml.processor.controller;
 import com.xml.processor.security.service.JwtService;
 import com.xml.processor.model.RefreshTokenRequest;
 import com.xml.processor.security.service.JwtBlacklistService;
-import com.xml.processor.service.impl.SecurityLogger;
+import com.xml.processor.service.impl.SecurityLoggerServiceImpl;
 import com.xml.processor.security.RateLimiter;
 import com.xml.processor.security.service.CsrfTokenService;
 import org.slf4j.Logger;
@@ -40,7 +40,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final JwtBlacklistService jwtBlacklistService;
-    private final SecurityLogger securityLogger;
+    private final SecurityLoggerServiceImpl securityLogger;
     private final RateLimiter rateLimiter;
     private final CsrfTokenService csrfTokenService;
 
@@ -201,19 +201,19 @@ class LoginRequest {
         this.username = username;
         this.password = password;
     }
-
+    
     public String getUsername() {
         return username;
     }
-
+    
     public void setUsername(String username) {
         this.username = username;
     }
-
+    
     public String getPassword() {
         return password;
     }
-
+    
     public void setPassword(String password) {
         this.password = password;
     }

@@ -1,8 +1,11 @@
 package com.xml.processor.service.impl;
 
 import com.xml.processor.model.Client;
+import com.xml.processor.model.Interface;
 import com.xml.processor.repository.ClientRepository;
+import com.xml.processor.repository.InterfaceRepository;
 import com.xml.processor.service.interfaces.ClientService;
+import com.xml.processor.dto.ClientOnboardingDTO;
 import jakarta.validation.ValidationException;
 import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -18,11 +23,13 @@ import java.util.stream.Collectors;
 public class ClientServiceImpl implements ClientService {
 
     private final ClientRepository clientRepository;
+    private final InterfaceRepository interfaceRepository;
     private final Validator validator;
 
     @Autowired
-    public ClientServiceImpl(ClientRepository clientRepository, Validator validator) {
+    public ClientServiceImpl(ClientRepository clientRepository, InterfaceRepository interfaceRepository, Validator validator) {
         this.clientRepository = clientRepository;
+        this.interfaceRepository = interfaceRepository;
         this.validator = validator;
     }
 
@@ -115,5 +122,46 @@ public class ClientServiceImpl implements ClientService {
     @Transactional(readOnly = true)
     public Page<Client> findInactiveClients(Pageable pageable) {
         return clientRepository.findByStatus("INACTIVE", pageable);
+    }
+
+    @Override
+    @Transactional
+    public Client onboardNewClient(ClientOnboardingDTO clientData) {
+        Client client = new Client();
+        client.setName(clientData.getName());
+        client.setDescription(clientData.getDescription());
+        client.setActive(clientData.getActive() != null ? clientData.getActive() : true);
+        client.setCreatedDate(LocalDateTime.now());
+        return clientRepository.save(client);
+    }
+
+    @Override
+    @Transactional
+    public Client cloneClient(Long sourceClientId, ClientOnboardingDTO clientData) {
+        Client sourceClient = clientRepository.findById(sourceClientId)
+            .orElseThrow(() -> new IllegalArgumentException("Client not found with id: " + sourceClientId));
+        
+        Client newClient = new Client();
+        newClient.setName(clientData.getName());
+        newClient.setDescription(clientData.getDescription());
+        newClient.setActive(clientData.getActive() != null ? clientData.getActive() : true);
+        newClient.setCreatedDate(LocalDateTime.now());
+        
+        // Save the new client first to get an ID
+        Client savedClient = clientRepository.save(newClient);
+        
+        // Clone interfaces if needed
+        List<Interface> sourceInterfaces = interfaceRepository.findByClientId(sourceClientId);
+        for (Interface sourceInterface : sourceInterfaces) {
+            Interface newInterface = new Interface();
+            newInterface.setName(sourceInterface.getName());
+            newInterface.setDescription(sourceInterface.getDescription());
+            newInterface.setType(sourceInterface.getType());
+            newInterface.setActive(sourceInterface.isActive());
+            newInterface.setClient(savedClient);
+            interfaceRepository.save(newInterface);
+        }
+        
+        return savedClient;
     }
 } 

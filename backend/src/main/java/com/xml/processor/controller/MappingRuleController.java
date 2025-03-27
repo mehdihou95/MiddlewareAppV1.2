@@ -103,4 +103,16 @@ public class MappingRuleController {
         Page<MappingRule> mappingRules = mappingRuleService.getMappingRulesByStatus(isActive, pageRequest);
         return ResponseEntity.ok(mappingRules);
     }
+
+    @GetMapping("/interfaces/{interfaceId}/mapping-rules")
+    public ResponseEntity<Page<MappingRule>> getMappingRulesByInterfaceId(
+        @PathVariable Long interfaceId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "name") String sortBy,
+        @RequestParam(defaultValue = "asc") String direction
+    ) {
+        // Reuse existing method to avoid duplication
+        return getMappingRulesByInterface(interfaceId, page, size, sortBy, direction);
+    }
 } 

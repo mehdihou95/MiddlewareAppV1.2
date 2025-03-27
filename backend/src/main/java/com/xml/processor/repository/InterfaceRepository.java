@@ -122,4 +122,12 @@ public interface InterfaceRepository extends JpaRepository<Interface, Long> {
      * @return List of active interfaces for the client
      */
     List<Interface> findByClient_IdAndIsActiveTrue(Long clientId);
+
+    /**
+     * Finds interfaces by client ID.
+     *
+     * @param clientId The ID of the client
+     * @return List of interfaces for the client
+     */
+    List<Interface> findByClientId(Long clientId);
 } 

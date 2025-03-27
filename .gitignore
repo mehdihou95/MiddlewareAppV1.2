@@ -1,35 +1,42 @@
-# Dependencies
-node_modules/
-/frontend/node_modules/
-/frontend/build/
-
-# Maven
-/backend/target/
-*.jar
-*.war
-
-# IDE
+# IDE files
 .idea/
-*.iml
 .vscode/
+*.iml
 
-# Logs
-*.log
+# Compiled files
+target/
+build/
+dist/
+*.class
+*.jar
+
+# Node modules
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
+# Environment files
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Database
-/data/
+# Database files
 *.db
+*.mv.db
+*.trace.db
 
-# Misc
+# Logs
+logs/
+*.log
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db 

@@ -121,4 +121,12 @@ public class Client {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    public void setActive(boolean active) {
+        this.status = active ? ClientStatus.ACTIVE : ClientStatus.INACTIVE;
+    }
+
+    public void setCreatedDate(LocalDateTime createdDate) {
+        this.createdAt = createdDate;
+    }
 } 

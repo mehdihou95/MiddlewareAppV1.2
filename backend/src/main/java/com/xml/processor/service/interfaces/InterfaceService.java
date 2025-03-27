@@ -2,6 +2,7 @@ package com.xml.processor.service.interfaces;
     
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.Client;
+import com.xml.processor.model.MappingRule;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -203,4 +204,21 @@ public interface InterfaceService {
      * @return true if the interface exists, false otherwise
      */
     boolean existsByNameAndClientId(String name, Long clientId);
+
+    /**
+     * Retrieves all mapping rules for an interface.
+     *
+     * @param interfaceId The ID of the interface
+     * @return List of mapping rules for the interface
+     */
+    List<MappingRule> getInterfaceMappings(Long interfaceId);
+
+    /**
+     * Updates mapping rules for an interface.
+     *
+     * @param interfaceId The ID of the interface
+     * @param mappings The new mapping rules
+     * @return List of updated mapping rules
+     */
+    List<MappingRule> updateInterfaceMappings(Long interfaceId, List<MappingRule> mappings);
 } 

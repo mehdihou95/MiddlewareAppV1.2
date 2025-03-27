@@ -18,7 +18,7 @@ public class EnhancedRateLimiter {
     private static final int SECONDARY_MAX_ATTEMPTS = 10;
     private static final long SECONDARY_WINDOW_MS = 3600000; // 1 hour
     private static final long MAX_BACKOFF_MS = 3600000; // 1 hour
-
+    
     private static class AttemptInfo {
         int count;
         long windowStart;

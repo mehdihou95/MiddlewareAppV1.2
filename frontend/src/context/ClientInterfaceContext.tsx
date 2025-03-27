@@ -141,13 +141,22 @@ export const ClientInterfaceProvider: React.FC<{ children: React.ReactNode }> = 
         direction: sortOrder
       });
       setClients(response.content);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading clients:', err);
-      setError('Failed to load initial clients');
+      
+      // Only clear data on authentication errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        clearAllData();
+        tokenService.clearTokens();
+        navigate('/login');
+      } else {
+        // For other errors, just show error message but keep existing data
+        setError('Failed to load clients. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const refreshInterfaces = async () => {
     if (!selectedClient) return;

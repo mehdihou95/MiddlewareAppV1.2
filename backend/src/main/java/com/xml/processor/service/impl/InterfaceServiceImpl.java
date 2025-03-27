@@ -4,7 +4,9 @@ import com.xml.processor.exception.ResourceNotFoundException;
 import com.xml.processor.exception.ValidationException;
 import com.xml.processor.model.Interface;
 import com.xml.processor.model.Client;
+import com.xml.processor.model.MappingRule;
 import com.xml.processor.repository.InterfaceRepository;
+import com.xml.processor.repository.MappingRuleRepository;
 import com.xml.processor.service.interfaces.InterfaceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,10 +38,12 @@ import java.io.StringReader;
 public class InterfaceServiceImpl implements InterfaceService {
     
     private final InterfaceRepository interfaceRepository;
+    private final MappingRuleRepository mappingRuleRepository;
     
     @Autowired
-    public InterfaceServiceImpl(InterfaceRepository interfaceRepository) {
+    public InterfaceServiceImpl(InterfaceRepository interfaceRepository, MappingRuleRepository mappingRuleRepository) {
         this.interfaceRepository = interfaceRepository;
+        this.mappingRuleRepository = mappingRuleRepository;
     }
     
     @Override
@@ -241,5 +246,33 @@ public class InterfaceServiceImpl implements InterfaceService {
     @Transactional(readOnly = true)
     public boolean existsByNameAndClientId(String name, Long clientId) {
         return interfaceRepository.existsByNameAndClient_Id(name, clientId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MappingRule> getInterfaceMappings(Long interfaceId) {
+        Interface interfaceEntity = interfaceRepository.findById(interfaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Interface not found with id: " + interfaceId));
+        return mappingRuleRepository.findByInterfaceId(interfaceId);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "interfaces", key = "#interfaceId")
+    public List<MappingRule> updateInterfaceMappings(Long interfaceId, List<MappingRule> mappings) {
+        Interface interfaceEntity = interfaceRepository.findById(interfaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Interface not found with id: " + interfaceId));
+        
+        // Delete existing mappings
+        mappingRuleRepository.deleteByInterfaceId(interfaceId);
+        
+        // Set interface reference and save new mappings
+        List<MappingRule> savedMappings = new ArrayList<>();
+        for (MappingRule mapping : mappings) {
+            mapping.setInterfaceEntity(interfaceEntity);
+            savedMappings.add(mappingRuleRepository.save(mapping));
+        }
+        
+        return savedMappings;
     }
 } 

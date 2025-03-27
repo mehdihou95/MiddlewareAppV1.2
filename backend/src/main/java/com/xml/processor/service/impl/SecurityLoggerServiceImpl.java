@@ -5,8 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SecurityLogger {
-    private static final Logger logger = LoggerFactory.getLogger(SecurityLogger.class);
+public class SecurityLoggerServiceImpl {
+    private static final Logger logger = LoggerFactory.getLogger(SecurityLoggerServiceImpl.class);
 
     public void logSuccessfulLogin(String username, String ipAddress) {
         logger.info("Successful login - User: {}, IP: {}", username, ipAddress);
@@ -37,7 +37,6 @@ public class SecurityLogger {
     }
 
     public void logSuspiciousActivity(String username, String activity, String ipAddress) {
-        logger.warn("Suspicious activity detected - User: {}, Activity: {}, IP: {}", 
-            username, activity, ipAddress);
+        logger.warn("Suspicious activity detected - User: {}, Activity: {}, IP: {}", username, activity, ipAddress);
     }
 } 

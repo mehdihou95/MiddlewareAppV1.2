@@ -1,9 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, AxiosRequestHeaders } from 'axios';
 import { tokenService, TokenResponse } from './tokenService';
-
-// API configuration
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-export const API_URL = `${API_BASE_URL}/api`;
+import { API_URL, DEFAULT_TIMEOUT } from '../config/apiConfig';
 
 // Request retry configuration
 interface RetryConfig extends AxiosRequestConfig {
@@ -29,6 +26,7 @@ export interface ErrorResponse {
 const createApiInstance = (): AxiosInstance => {
   const instance = axios.create({
     baseURL: API_URL,
+    timeout: DEFAULT_TIMEOUT,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -56,6 +54,12 @@ const createApiInstance = (): AxiosInstance => {
         if (csrfToken) {
           config.headers['X-CSRF-TOKEN'] = csrfToken;
         }
+      }
+      
+      // Add client context if available
+      const clientId = localStorage.getItem('selectedClientId');
+      if (clientId) {
+        config.headers['X-Client-ID'] = clientId;
       }
       
       return config;

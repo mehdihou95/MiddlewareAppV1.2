@@ -6,20 +6,21 @@ application:
       expiration: 3600000  # 1 hour in milliseconds
       refresh-token:
         expiration: 604800000  # 7 days in milliseconds
+    token-blacklist: in-memory
 
 # Redis Configuration (for distributed token blacklist and rate limiting)
-spring:
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    
-  # Session Configuration
-  session:
-    store-type: redis
-    redis:
-      namespace: xml-processor:session
-    timeout: 1800  # 30 minutes
+#spring:
+#  redis:
+#    host: ${REDIS_HOST:localhost}
+#    port: ${REDIS_PORT:6379}
+#    password: ${REDIS_PASSWORD:}
+#    
+#  # Session Configuration
+#  session:
+#    store-type: redis
+#    redis:
+#      namespace: xml-processor:session
+#    timeout: 1800  # 30 minutes
 
 # Security Configuration
 security:
