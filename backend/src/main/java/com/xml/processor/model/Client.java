@@ -40,6 +40,9 @@ public class Client {
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Interface> interfaces = new HashSet<>();
 
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MappingRule> mappingRules = new HashSet<>();
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -104,6 +107,14 @@ public class Client {
 
     public void setInterfaces(Set<Interface> interfaces) {
         this.interfaces = interfaces;
+    }
+
+    public Set<MappingRule> getMappingRules() {
+        return mappingRules;
+    }
+
+    public void setMappingRules(Set<MappingRule> mappingRules) {
+        this.mappingRules = mappingRules;
     }
 
     public LocalDateTime getCreatedAt() {

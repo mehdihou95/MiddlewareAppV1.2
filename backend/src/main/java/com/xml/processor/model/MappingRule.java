@@ -73,6 +73,13 @@ public class MappingRule extends BaseEntity {
     @Column
     private String transformationRule;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    @Column(name = "client_id", insertable = false, updatable = false)
+    private Long clientId;
+
     public MappingRule() {
         super();
         this.isActive = true;
@@ -149,5 +156,24 @@ public class MappingRule extends BaseEntity {
 
     public boolean isRequired() {
         return required != null ? required : false;
+    }
+
+    public Client getClient() {
+        return client;
+    }
+
+    public void setClient(Client client) {
+        this.client = client;
+    }
+
+    public Long getClientId() {
+        return client != null ? client.getId() : null;
+    }
+
+    public void setClientId(Long clientId) {
+        if (clientId != null) {
+            this.client = new Client();
+            this.client.setId(clientId);
+        }
     }
 } 

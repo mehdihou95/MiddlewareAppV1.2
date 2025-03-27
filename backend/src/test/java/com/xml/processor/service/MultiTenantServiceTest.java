@@ -6,11 +6,13 @@ import com.xml.processor.model.AsnHeader;
 import com.xml.processor.model.AsnLine;
 import com.xml.processor.model.ProcessedFile;
 import com.xml.processor.model.MappingRule;
+import com.xml.processor.model.Interface;
 import com.xml.processor.repository.ClientRepository;
 import com.xml.processor.repository.AsnHeaderRepository;
 import com.xml.processor.repository.AsnLineRepository;
 import com.xml.processor.repository.ProcessedFileRepository;
 import com.xml.processor.repository.MappingRuleRepository;
+import com.xml.processor.repository.InterfaceRepository;
 import com.xml.processor.service.interfaces.ClientService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,9 @@ public class MultiTenantServiceTest {
 
     @Autowired
     private MappingRuleRepository mappingRuleRepository;
+
+    @Autowired
+    private InterfaceRepository interfaceRepository;
 
     private Client client1;
     private Client client2;
@@ -92,15 +97,26 @@ public class MultiTenantServiceTest {
     }
 
     @Test
-    void testCrossClientAccess() {
-        // Create test data for client1
+    public void testCrossClientAccess() {
+        // Create an interface for client1
+        Interface interface1 = new Interface();
+        interface1.setName("TEST_INTERFACE_1");
+        interface1.setType("XML");
+        interface1.setActive(true);
+        interface1.setClient(client1);
+        interface1.setRootElement("root");
+        interfaceRepository.save(interface1);
+
+        // Create a processed file for client1
         ProcessedFile file1 = new ProcessedFile();
-        file1.setClient(client1);
         file1.setFileName("test1.xml");
         file1.setStatus("PENDING");
+        file1.setProcessedAt(LocalDateTime.now());
+        file1.setClient(client1);
+        file1.setInterfaceEntity(interface1);
         processedFileRepository.save(file1);
 
-        // Attempt to access client1's data through client2's context
+        // Try to access client1's data through client2's context
         List<ProcessedFile> client2Files = processedFileRepository.findByClient_Id(client2.getId());
         assertTrue(client2Files.isEmpty());
     }
@@ -108,7 +124,7 @@ public class MultiTenantServiceTest {
     @Test
     void testClientDeletion() {
         // Create test data for client1
-        MappingRule rule1 = new MappingRule(); // Use default constructor
+        MappingRule rule1 = new MappingRule();
         rule1.setName("Test Rule 1");
         rule1.setXmlPath("/root/element");
         rule1.setDatabaseField("target");
@@ -118,6 +134,10 @@ public class MultiTenantServiceTest {
         rule1.setDataType("String");
         rule1.setClient(client1);
         mappingRuleRepository.save(rule1);
+
+        // Add the rule to client1's mapping rules set
+        client1.getMappingRules().add(rule1);
+        clientService.saveClient(client1);
 
         // Delete client1
         clientService.deleteClient(client1.getId());
