@@ -27,7 +27,9 @@ export const tokenService = {
   },
   
   getAccessToken: (): string | null => {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    console.log('Retrieved token from storage:', token ? `${token.substring(0, 10)}...` : 'null');
+    return token;
   },
   
   removeAccessToken: (): void => {

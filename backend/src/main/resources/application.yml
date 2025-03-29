@@ -89,8 +89,9 @@ logging:
     com.xml.processor: DEBUG
     org.springframework.security: TRACE
     org.springframework.web: DEBUG
-    com.xml.processor.config.CsrfTokenLoggingFilter: TRACE
-    org.springframework.security.web.csrf: TRACE
+    com.xml.processor.security.filter: TRACE
+    com.xml.processor.security.service: TRACE
+    com.xml.processor.config: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 

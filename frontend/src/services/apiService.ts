@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, AxiosRequestHeaders } from 'axios';
 import { tokenService, TokenResponse } from './tokenService';
 import { API_URL, DEFAULT_TIMEOUT } from '../config/apiConfig';
+import { authService } from './authService';
 
 // Request retry configuration
 interface RetryConfig extends AxiosRequestConfig {
@@ -35,47 +36,59 @@ const createApiInstance = (): AxiosInstance => {
   
   // Configure request interceptor
   instance.interceptors.request.use(
-    (config) => {
+    async (config) => {
       if (!config.headers) {
         config.headers = {} as AxiosRequestHeaders;
       }
       
       // Debug: Log request details
       console.log('Making request to:', config.url);
-      console.log('Request method:', config.method);
       
-      // Skip auth token for auth endpoints
+      // Add Authorization header for all requests except auth endpoints
       if (!config.url?.includes('/auth/')) {
         const token = tokenService.getAccessToken();
-        console.log('Token retrieval attempt');
-        console.log('Token found:', token ? 'Yes' : 'No');
+        console.log('Token available for request:', !!token);
         
         if (token) {
-          // Debug: Log token details
-          try {
-            const tokenPayload = tokenService.getTokenPayload();
-            console.log('Token payload:', tokenPayload);
-            console.log('Token roles:', tokenPayload?.roles);
-          } catch (e) {
-            console.error('Error parsing token:', e);
+          // Validate token before using it
+          if (tokenService.isTokenValid(token)) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+            console.log('Valid token added to Authorization header');
+            
+            // Log user info from token
+            const userInfo = tokenService.getUserInfo();
+            console.log('Current user info:', userInfo);
+          } else {
+            console.log('Token is invalid or expired, attempting refresh');
+            try {
+              const newToken = await authService.refreshToken();
+              config.headers['Authorization'] = `Bearer ${newToken}`;
+              console.log('New token obtained and added to Authorization header');
+            } catch (error) {
+              console.error('Token refresh failed:', error);
+              // Only redirect to login if not already there and not trying to login
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+                return Promise.reject('Authentication required');
+              }
+            }
           }
-          
-          config.headers['Authorization'] = `Bearer ${token}`;
-          console.log('Added Authorization header:', `Bearer ${token.substring(0, 10)}...`);
         } else {
           console.warn('No token available for request to:', config.url);
+          // Only redirect to login if not already there and not trying to login
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+            return Promise.reject('Authentication required');
+          }
         }
-      } else {
-        console.log('Skipping auth token for auth endpoint');
       }
       
       // Add CSRF token for non-GET requests
       if (config.method?.toUpperCase() !== 'GET') {
         const csrfToken = tokenService.getCsrfToken();
-        console.log('CSRF token found:', csrfToken ? 'Yes' : 'No');
         if (csrfToken) {
           config.headers['X-XSRF-TOKEN'] = csrfToken;
-          console.log('Added CSRF token header');
+          console.log('CSRF token added to request');
         }
       }
       
@@ -83,17 +96,8 @@ const createApiInstance = (): AxiosInstance => {
       const clientId = localStorage.getItem('selectedClientId');
       if (clientId) {
         config.headers['X-Client-ID'] = clientId;
-        console.log('Added Client ID header:', clientId);
+        console.log('Client context added:', clientId);
       }
-      
-      // Log final request configuration
-      console.log('Final request headers:', config.headers);
-      console.log('Final request configuration:', {
-        url: config.url,
-        method: config.method,
-        baseURL: config.baseURL,
-        withCredentials: config.withCredentials
-      });
       
       return config;
     },

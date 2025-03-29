@@ -36,19 +36,40 @@ export const authService = {
     login: async (username: string, password: string): Promise<LoginResponse> => {
         console.log('Attempting login for user:', username);
         try {
-            const response = await api.post<LoginResponse>(ENDPOINTS.AUTH.LOGIN, { 
-                username: username.trim(), 
-                password: password.trim() 
+            const response = await api.post<LoginResponse>(ENDPOINTS.AUTH.LOGIN, {
+                username: username.trim(),
+                password: password.trim()
             });
-            console.log('Login successful, storing tokens');
             
-            // Store tokens
-            tokenService.setTokens(response.data.token, response.data.refreshToken);
+            console.log('Login response received:', response.data);
             
-            // Store CSRF token if provided
-            if (response.data.csrfToken) {
-                tokenService.setCsrfToken(response.data.csrfToken);
+            // Store tokens and user info
+            if (response.data.token) {
+                console.log('Storing access token and user info');
+                tokenService.setAccessToken(response.data.token);
+                // Store user info in localStorage for persistence
+                localStorage.setItem('user', JSON.stringify({
+                    username: response.data.username,
+                    roles: response.data.roles
+                }));
+            } else {
+                console.error('No access token in response');
             }
+            
+            if (response.data.refreshToken) {
+                console.log('Storing refresh token');
+                tokenService.setRefreshToken(response.data.refreshToken);
+            } else {
+                console.error('No refresh token in response');
+            }
+            
+            // Set Authorization header for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+            console.log('Default Authorization header set');
+            
+            // Initialize API instance with stored token
+            const userInfo = tokenService.getUserInfo();
+            console.log('User info from token:', userInfo);
             
             return response.data;
         } catch (error) {

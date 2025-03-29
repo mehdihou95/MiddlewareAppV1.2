@@ -61,43 +61,47 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.securityMatcher("/**")
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/h2-console/**")
+                .ignoringRequestMatchers("/api/auth/**")
+                .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(csrfTokenRequestHandler)
+            )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // User management endpoints
+                .requestMatchers("/api/users/**").hasRole("ADMIN")
                 // Client endpoints
                 .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.POST, "/api/clients/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasRole("ADMIN")
-                // Interface endpoints
-                .requestMatchers(HttpMethod.GET, "/api/interfaces/**").hasAnyRole("ADMIN", "USER")
-                .requestMatchers(HttpMethod.POST, "/api/interfaces/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/interfaces/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/interfaces/**").hasRole("ADMIN")
-                // Default deny
                 .anyRequest().authenticated()
             )
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/h2-console/**")
-                .ignoringRequestMatchers("/api/auth/login", "/api/auth/refresh")
-                .ignoringRequestMatchers("/api/auth/refresh-csrf")
-                .csrfTokenRepository(csrfTokenRepository)
-                .csrfTokenRequestHandler(csrfTokenRequestHandler)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.sameOrigin())
             )
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, authException) -> {
+                    logger.error("Authentication error: " + authException.getMessage());
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"" + authException.getMessage() + "\"}");
+                })
+            )
             .authenticationProvider(authenticationProvider);
 
-        // Add filters in the correct order using addFilterBefore
+        // Add filters in the correct order
         http.addFilterBefore(clientContextFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
+        
         return http.build();
     }
 

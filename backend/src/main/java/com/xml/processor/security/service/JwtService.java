@@ -172,24 +172,26 @@ public class JwtService {
      */
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
-            final Claims claims = extractAllClaims(token);
-            final String username = claims.getSubject();
-            final Date expiration = claims.getExpiration();
+            final String username = extractUsername(token);
+            log.debug("Validating token for user: " + username);
             
-            // First check basic validity: matching username and not expired
-            if (!username.equals(userDetails.getUsername()) || expiration.before(new Date())) {
+            if (!username.equals(userDetails.getUsername())) {
+                log.warn("Token username doesn't match UserDetails username");
+                return false;
+            }
+            
+            if (isTokenExpired(token)) {
+                log.warn("Token is expired");
                 return false;
             }
             
             // For access tokens, validate fingerprint if present
-            // This helps prevent token theft by binding the token to the original request context
+            Claims claims = extractAllClaims(token);
             if (claims.containsKey("type") && "ACCESS".equals(claims.get("type"))) {
                 if (claims.containsKey("fingerprint")) {
-                    // Generate expected fingerprint based on current request
                     String expectedFingerprint = generateFingerprint(userDetails);
                     String tokenFingerprint = claims.get("fingerprint", String.class);
                     
-                    // If fingerprints don't match, token might be stolen
                     if (!expectedFingerprint.equals(tokenFingerprint)) {
                         log.warn("Token fingerprint mismatch for user: {}", username);
                         return false;
@@ -197,12 +199,10 @@ public class JwtService {
                 }
             }
             
+            log.debug("Token is valid");
             return true;
-        } catch (ExpiredJwtException e) {
-            log.debug("Token expired: {}", e.getMessage());
-            return false;
         } catch (Exception e) {
-            log.error("Error validating token: {}", e.getMessage());
+            log.error("Error validating token: " + e.getMessage(), e);
             return false;
         }
     }
@@ -225,8 +225,12 @@ public class JwtService {
      */
     public boolean isTokenExpired(String token) {
         try {
-            return extractExpiration(token).before(new Date());
-        } catch (ExpiredJwtException e) {
+            final Date expiration = extractExpiration(token);
+            boolean isExpired = expiration.before(new Date());
+            log.debug("Token expiration: " + expiration + ", isExpired: " + isExpired);
+            return isExpired;
+        } catch (Exception e) {
+            log.error("Error checking token expiration: " + e.getMessage(), e);
             return true;
         }
     }
